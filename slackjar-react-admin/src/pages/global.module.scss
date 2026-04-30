@@ -1,0 +1,153 @@
+/**
+ * 全局公共样式
+ * 用于系统中多个页面复用的组件样式
+ */
+
+/* ========== 通用搜索栏样式 ========== */
+.searchBar {
+  :global(.ant-card-body) {
+    display: flex;
+    align-items: center;
+    //justify-content: space-between;
+    padding: 0 !important;
+  }
+
+  padding-left: 8px;
+  background-color: #fff;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.searchLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+
+  :global(.ant-form) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  :global(.ant-form-item) {
+    margin-bottom: 0;
+  }
+}
+
+.searchRight {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 20px;
+}
+
+/* ========== 通用Tabs栏样式 ========== */
+.tabsContainer {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabsComponent {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tabsComponent :global(.ant-tabs-content-holder) {
+  flex: 1;
+  overflow: hidden;
+}
+
+.tabsComponent :global(.ant-tabs-content) {
+  height: 100%;
+}
+
+.tabsComponent :global(.ant-tabs-tabpane) {
+  height: 100%;
+}
+
+.tabsComponent :global(.ant-tabs-nav) {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 20;
+}
+
+/* ========== 自定义滚动条样式 ========== */
+.scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+}
+
+/* ========== 通用页面容器样式 ========== */
+.pageContainer {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+}
+
+/* ========== 通用表格卡片样式 ========== */
+.tableCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.itemTableWrap {
+  background-color: #fff;
+  border-radius: 2px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+  padding-bottom: 8px;
+}
+
+/* ========== 通用表格样式 ========== */
+.table {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background-color: #fff;
+
+  :global(.ant-table-thead > tr > th) {
+    background-color: #fafafa;
+    font-weight: 500;
+    color: #262626;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  :global(.ant-table-tbody > tr > td) {
+    padding: 10px 12px;
+    color: #595959;
+    font-size: 13px;
+  }
+
+  :global(.ant-table-tbody > tr:hover > td) {
+    background-color: #e6f7ff;
+  }
+}

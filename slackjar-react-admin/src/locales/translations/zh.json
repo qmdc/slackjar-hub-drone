@@ -1,0 +1,31 @@
+{
+  "title": "SlackHub",
+  "loading": "加载中...",
+  "menu": {
+    "home": "首页",
+    "detection": "目标检测",
+    "image detection": "图片识别",
+    "video detection": "视频识别",
+    "multi video detection": "多路视频检测",
+    "detection history": "检测历史",
+    "model management": "模型管理",
+    "metrics": "指标展示",
+    "account management": "账户管理",
+    "user management": "用户管理",
+    "role management": "角色管理",
+    "permission management": "权限管理",
+    "system management": "系统管理",
+    "config management": "配置管理",
+    "system params": "系统参数",
+    "system dict": "数据字典",
+    "system file": "系统文件",
+    "dev examples": "开发示例",
+    "action success": "操作成功",
+    "action fail": "操作失败",
+    "page 403": "403 页面",
+    "page 404": "404 页面",
+    "other": "其他",
+    "personal center": "个人中心",
+    "logged out": "退出登录"
+  }
+}

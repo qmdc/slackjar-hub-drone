@@ -1,0 +1,12 @@
+.permPage {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.actionBtn {
+    padding: 0 4px !important;
+    font-size: 13px !important;
+    height: auto !important;
+}

@@ -1,0 +1,24 @@
+{
+  "title": "SlackHub",
+  "loading": "Loading...",
+  "menu": {
+    "home": "Home",
+    "account management": "Account",
+    "user management": "User",
+    "role management": "Role",
+    "permission management": "Permission",
+    "system management": "System",
+    "config management": "Config",
+    "system params": "Params",
+    "system dict": "Dictionary",
+    "system file": "Files",
+    "dev examples": "Examples",
+    "action success": "Success",
+    "action fail": "Failure",
+    "page 403": "403 Page",
+    "page 404": "404 Page",
+    "other": "Other",
+    "personal center": "Personal Center",
+    "logged out": "Logout"
+  }
+}

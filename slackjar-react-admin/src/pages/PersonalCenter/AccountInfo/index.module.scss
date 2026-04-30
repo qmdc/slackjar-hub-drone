@@ -1,0 +1,196 @@
+.accountInfoPage {
+  padding: 24px;
+
+  .infoCard {
+    margin-bottom: 24px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .cardBody {
+    padding: 24px;
+  }
+
+  .infoHeader {
+    display: flex;
+    align-items: flex-start;
+    gap: 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid #f0f0f0;
+    margin-bottom: 24px;
+  }
+
+  .avatarSection {
+    flex-shrink: 0;
+  }
+
+  .avatarWrapper {
+    position: relative;
+    display: inline-block;
+  }
+
+  .avatar {
+    width: 120px;
+    height: 120px;
+    border: 3px solid #f0f0f0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .statusDot {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #57cd1c;
+    // border: 3px solid #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+
+  .userInfoSection {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .userName {
+    font-size: 20px;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.85);
+    margin-bottom: 4px;
+  }
+
+  .userTag {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.45);
+    margin-bottom: 16px;
+  }
+
+  .userTags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .infoActions {
+    display: flex;
+    gap: 8px;
+  }
+
+  .detailGrid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+
+  .detailItem {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: #fafafa;
+    border-radius: 6px;
+    gap: 12px;
+  }
+
+  .detailIcon {
+    font-size: 16px;
+    color: #1890ff;
+    flex-shrink: 0;
+  }
+
+  .detailLabel {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.5);
+    margin-right: 8px;
+  }
+
+  .detailValue {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.85);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .roleCard {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  }
+
+  .cardHeader {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+    color: rgba(0, 0, 0, 0.85);
+  }
+
+  .cardTitleIcon {
+    font-size: 16px;
+    color: #1890ff;
+  }
+
+  .roleTable {
+    :global(.ant-table-thead > tr > th) {
+      background: #fafafa;
+      font-weight: 500;
+      color: rgba(0, 0, 0, 0.7);
+    }
+
+    :global(.ant-table-tbody > tr:hover > td) {
+      background: #fafafa;
+    }
+  }
+
+  .editModalForm {
+    padding: 24px 0;
+  }
+
+  .formItem {
+    margin-bottom: 24px;
+  }
+
+  .uploadSection {
+    display: flex;
+    gap: 32px;
+    justify-content: center;
+    padding: 16px 0;
+  }
+
+  .uploadItem {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .uploadLabel {
+    font-size: 13px;
+    color: rgba(0, 0, 0, 0.65);
+    font-weight: 500;
+  }
+
+  .uploadHint {
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.35);
+    margin-top: 4px;
+  }
+
+  .previewImage {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+  }
+
+  .permissionModal {
+    :global(.ant-table-thead > tr > th) {
+      background: #fafafa;
+      font-weight: 500;
+    }
+  }
+}

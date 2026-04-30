@@ -1,0 +1,84 @@
+.appConfigContainer {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+}
+
+.configContent {
+    width: 100%;
+    background-color: #fff;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 60px;
+}
+
+.configItem {
+    margin-bottom: 18px;
+    padding: 0 20px 18px 18px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.configItem:first-child {
+    padding-top: 1px;
+}
+
+.configItem:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding: 18px 20px 0 18px;
+}
+
+.configName {
+    font-weight: 500;
+    color: #262626;
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.configValue {
+    margin-bottom: 8px;
+    max-width: 400px;
+}
+
+.configValue :global(.ant-input),
+.configValue :global(.ant-input-number) {
+    width: 100%;
+    max-width: 400px;
+}
+
+.configDescription {
+    margin-bottom: 8px;
+}
+
+.descriptionText {
+    color: #8c8c8c;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.configFooter {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #fff;
+    padding: 12px;
+    border-top: 1px solid #f0f0f0;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+    display: flex;
+    justify-content: flex-start;
+    z-index: 10;
+}
+
+.configFooter :global(.ant-btn) {
+    min-width: 80px;
+}
+
+.configValue :global(.ant-radio-group) {
+    white-space: nowrap;
+    display: inline-block;
+}

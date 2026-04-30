@@ -1,0 +1,122 @@
+// 顶部导航栏容器样式
+.header {
+  height: 48px; // 固定高度 48px
+  line-height: 48px; // 行高等于高度，实现垂直居中
+  background: #fff; // 乳白色背景
+  position: fixed; // 固定定位，不随页面滚动
+  top: 0; // 顶部对齐
+  left: 0; // 左侧对齐
+  right: 0; // 右侧对齐
+  z-index: 100; // 层级 100，确保在其他内容之上
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); // 底部柔和阴影效果
+  min-width: 1200px; // 最小宽度 1200px，防止在小屏幕上过度压缩
+}
+
+// 覆盖 Ant Design Layout.Header 默认样式
+.header .ant-layout-header {
+  height: 46px; // 固定高度 48px
+  line-height: 46px; // 垂直居中
+  padding: 0 24px; // 左右内边距 24px
+}
+
+// 覆盖 Ant Design Layout.Header 默认样式
+:global(.ant-layout-header) {
+  height: 46px;
+  line-height: 46px;
+  padding: 0 !important;
+}
+
+// Logo 区域样式
+.logo {
+  font-size: 15px;
+  font-weight: 500;
+  color: #40a0f9;
+  margin-right: 8px;
+  margin-left: 8px;
+  white-space: nowrap;
+  line-height: 48px;
+  display: flex;
+  align-items: center;
+}
+
+// Logo 区域样式
+.logo {
+  font-size: 16px;                // 字体大小
+  font-weight: 600;               // 字体加粗
+  color: #1890ff;                 // Ant Design 主色调（蓝色）
+  margin-right: 24px;             // 右侧外边距，与菜单间隔
+  white-space: nowrap;            // 防止文字换行
+  line-height: 48px;              // 行高等于 Header 高度，实现垂直居中
+}
+
+// 全局样式 - 禁用 body 和 html 的滚动条
+:global(html),
+:global(body),
+:global(#root) {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden !important;
+}
+
+// 主布局容器样式
+.mainLayout {
+  height: 100vh !important; // 全屏高度，强制覆盖
+  padding-top: 48px; // 顶部内边距 48px，避开固定的 Header
+  min-width: 1200px; // 最小宽度 1200px，保证内容不被过度压缩
+  overflow: hidden !important; // 强制防止整个页面滚动
+}
+
+// 内容区域布局（包含侧边栏和右侧内容）
+.contentLayout {
+  height: 100% !important; // 占满mainLayout的剩余高度
+  overflow: hidden !important; // 强制防止此区域滚动
+}
+
+// 右侧布局（包含面包屑和内容区）
+.rightLayout {
+  display: flex;
+  flex-direction: column;
+  height: 100% !important;
+  padding: 0 8px 8px 6px; // 只有右边有padding，底部无padding
+  overflow: hidden !important;
+}
+
+// 面包屑包装器 - 固定不动
+.breadcrumbsWrapper {
+  flex-shrink: 0; // 防止被压缩
+  flex-grow: 0; // 防止被拉伸
+  padding: 0 0;
+  margin: 0;
+}
+
+// 可滚动的内容区
+.scrollableContent {
+  flex: 1 1 auto !important; // 占据剩余空间
+  overflow-y: auto !important; // 允许垂直滚动
+  overflow-x: hidden !important; // 禁止水平滚动
+  border-radius: 6px;
+}
+
+// 覆盖 Ant Design Layout 的默认样式
+:global(.ant-layout) {
+  overflow: hidden !important;
+}
+
+// 侧边栏样式优化
+:global(.ant-layout-sider) {
+  overflow: hidden !important;
+  flex: 0 0 200px !important; // 固定宽度，不伸缩
+  padding: 8px 0 8px 8px; // 上padding 8px，右padding 0，下padding 8px，左padding 8px
+  box-sizing: border-box !important;
+  background: transparent !important; // 透明背景，让内部容器控制背景色
+}
+
+// 侧边栏内部容器
+:global(.ant-layout-sider-children) {
+  height: 100% !important;
+  overflow-y: auto !important; // 侧边栏内部如果需要滚动可以滚动，但整体布局固定
+  background: #fff !important; // 白色背景
+  border-radius: 8px !important; // 圆角效果
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important; // 柔和阴影
+}

@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人主页</title>
+    <link rel="icon" type="image/png" href="https://slackjar.oss-cn-hangzhou.aliyuncs.com/service/resources/favicon-sailboat.png" />
+    <style>
+        :root {
+            --primary-color: #60a5fa;
+            --text-color: #f0f0f0;
+            --text-secondary: #a0a0a0;
+            --bg-color: #121212;
+            --card-bg: rgba(30, 30, 30, 0.7);
+            --border-radius: 8px;
+            --spacing: 2rem;
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        p {
+            line-height: 1.7;
+            margin-bottom: 0.5rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            letter-spacing: 0.02em;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            color: var(--text-color);
+            line-height: 1.7;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #0a0e1c;
+            position: relative;
+            overflow-x: hidden;
+            font-weight: 300;
+            letter-spacing: 0.03em;
+        }
+        
+        /* 夜空与山峦背景 SVG */
+        .mountain-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: -1;
+            opacity: 1;
+        }
+        
+        /* 统一背景色 - 确保与星空渐变协调 */
+        
+        .container {
+            max-width: 800px;
+            width: 90%;
+            margin: 0 auto;
+            padding: 3rem 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            text-align: center;
+        }
+        
+        /* 头部信息 */
+        .header {
+            text-align: center;
+            margin-bottom: var(--spacing);
+            width: 100%;
+        }
+        
+        .avatar {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background-color: #1e293b;
+            margin-bottom: 1.5rem;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: var(--transition);
+            backdrop-filter: blur(5px);
+        }
+        
+        .avatar:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+            letter-spacing: -0.3px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+        }
+        
+        .intro {
+            max-width: 600px;
+            margin: 0 auto 2rem;
+            font-size: 1.05rem;
+            line-height: 1.8;
+            color: var(--text-secondary);
+            text-align: center;
+            font-weight: 300;
+            letter-spacing: 0.02em;
+        }
+        
+        /* 社交链接 */
+        .social-links {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: var(--spacing);
+            width: 100%;
+        }
+        
+        .social-link {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            color: var(--text-color);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            opacity: 0.7;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            border-radius: 8px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .social-link:hover {
+            opacity: 1;
+            transform: translateY(-3px);
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .social-link svg {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 0.5rem;
+        }
+        
+        /* 页脚 */
+        .footer {
+            text-align: center;
+            padding: 1.5rem 0;
+            width: 100%;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+            letter-spacing: 0.04em;
+        }
+        
+        .footer a {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: var(--transition);
+            font-weight: 400;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+            opacity: 0.9;
+        }
+        
+        /* 卡片组件 */
+        .card {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: var(--border-radius);
+            padding: 20px 5px 0px 5px;
+            margin-bottom: 2rem;
+            margin-top: 1px;
+            width: 100%;
+            max-width: 700px;
+            max-height: 200px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(10px);
+            transition: var(--transition);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-weight: 300;
+            letter-spacing: 0.02em;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
+            background-color: rgba(255, 255, 255, 0.08);
+        }
+        
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 2rem 0;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .avatar {
+                width: 100px;
+                height: 100px;
+            }
+            
+            .social-link {
+                min-width: 100px;
+                padding: 0.7rem 1rem;
+                font-size: 0.9rem;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .social-links {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .social-link {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+        
+        /* 动画效果 */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .animate {
+            animation: fadeIn 0.8s ease forwards;
+            opacity: 0;
+        }
+        
+        .delay-1 {
+            animation-delay: 0.2s;
+        }
+        
+        .delay-2 {
+            animation-delay: 0.4s;
+        }
+        
+        .delay-3 {
+            animation-delay: 0.6s;
+        }
+        
+        .delay-4 {
+            animation-delay: 0.8s;
+        }
+        
+        /* Hitokoto内容样式 */
+        .hitokoto-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            padding: 0 0;
+        }
+        
+        #hitokoto-text {
+            font-size: 1.2rem;
+            line-height: 1.5;
+            color: var(--text-color);
+            text-align: center;
+            font-weight: 300;
+            letter-spacing: 0.03em;
+            margin: 0;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+        
+        .hitokoto-from {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            text-align: center;
+            font-weight: 200;
+            letter-spacing: 0.06em;
+            margin: 0;
+            font-style: italic;
+            opacity: 0.85;
+        }
+        
+        /* 社交链接样式覆盖 */
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- 夜空与山峦背景 SVG -->
+    <svg class="mountain-bg" viewBox="0 0 1440 500" preserveAspectRatio="none">
+        <!-- 夜空渐变背景 -->
+        <defs>
+            <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#0a0e1c" />
+                <stop offset="50%" stop-color="#131b31" />
+                <stop offset="100%" stop-color="#1a233a" />
+            </linearGradient>
+            <!-- 流星动画 -->
+            <filter id="glow" x="-200%" y="-200%" width="500%" height="500%">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+        </defs>
+        <!-- 星空背景 -->
+        <rect x="0" y="0" width="1440" height="500" fill="url(#skyGradient)" />
+        
+        <!-- 随机分布的星星 -->
+        <!-- 小星星 -->
+        <g fill="#ffffff" opacity="0.6">
+            <circle cx="120" cy="80" r="1" />
+            <circle cx="280" cy="150" r="0.8" />
+            <circle cx="420" cy="90" r="1" />
+            <circle cx="580" cy="220" r="0.7" />
+            <circle cx="720" cy="130" r="0.9" />
+            <circle cx="860" cy="60" r="0.8" />
+            <circle cx="1020" cy="180" r="1" />
+            <circle cx="1180" cy="110" r="0.9" />
+            <circle cx="340" cy="260" r="0.7" />
+            <circle cx="560" cy="70" r="0.8" />
+            <circle cx="780" cy="240" r="1" />
+            <circle cx="940" cy="150" r="0.9" />
+            <circle cx="1100" cy="210" r="0.7" />
+            <circle cx="1260" cy="80" r="0.8" />
+            <circle cx="1400" cy="170" r="1" />
+            <circle cx="180" cy="210" r="0.9" />
+            <circle cx="320" cy="30" r="0.7" />
+            <circle cx="460" cy="150" r="0.8" />
+            <circle cx="620" cy="270" r="1" />
+            <circle cx="760" cy="90" r="0.9" />
+            <circle cx="900" cy="220" r="0.7" />
+            <circle cx="1060" cy="50" r="0.8" />
+            <circle cx="1220" cy="250" r="1" />
+            <circle cx="1380" cy="130" r="0.9" />
+            <!-- 新增小星星 -->
+            <circle cx="50" cy="50" r="0.7" />
+            <circle cx="150" cy="200" r="0.8" />
+            <circle cx="350" cy="120" r="0.7" />
+            <circle cx="500" cy="180" r="0.8" />
+            <circle cx="650" cy="50" r="0.7" />
+            <circle cx="800" cy="200" r="0.8" />
+            <circle cx="950" cy="80" r="0.7" />
+            <circle cx="1100" cy="250" r="0.8" />
+            <circle cx="1250" cy="150" r="0.7" />
+            <circle cx="1400" cy="50" r="0.8" />
+        </g>
+        <!-- 中等星星 -->
+        <g fill="#ffffff" opacity="0.8">
+            <circle cx="200" cy="100" r="1.2" />
+            <circle cx="400" cy="180" r="1.1" />
+            <circle cx="600" cy="120" r="1.2" />
+            <circle cx="800" cy="60" r="1.1" />
+            <circle cx="1000" cy="200" r="1.2" />
+            <circle cx="1200" cy="100" r="1.1" />
+            <circle cx="1400" cy="230" r="1.2" />
+            <circle cx="300" cy="250" r="1.1" />
+            <circle cx="500" cy="80" r="1.2" />
+            <circle cx="700" cy="200" r="1.1" />
+            <circle cx="900" cy="100" r="1.2" />
+            <circle cx="1100" cy="150" r="1.1" />
+            <circle cx="1300" cy="70" r="1.2" />
+            <!-- 新增中等星星 -->
+            <circle cx="100" cy="150" r="1.1" />
+            <circle cx="300" cy="50" r="1.2" />
+            <circle cx="500" cy="200" r="1.1" />
+            <circle cx="700" cy="100" r="1.2" />
+            <circle cx="900" cy="250" r="1.1" />
+            <circle cx="1100" cy="50" r="1.2" />
+            <circle cx="1300" cy="180" r="1.1" />
+        </g>
+        <!-- 大而亮的星星 -->
+        <g fill="#ffffff" opacity="1">
+            <circle cx="250" cy="50" r="1.5" />
+            <circle cx="550" cy="150" r="1.3" />
+            <circle cx="850" cy="250" r="1.5" />
+            <circle cx="1150" cy="30" r="1.3" />
+            <circle cx="1350" cy="200" r="1.5" />
+            <!-- 新增大星星 -->
+            <circle cx="50" cy="150" r="1.4" />
+            <circle cx="350" cy="100" r="1.6" />
+            <circle cx="650" cy="200" r="1.4" />
+            <circle cx="950" cy="150" r="1.6" />
+            <circle cx="1250" cy="100" r="1.4" />
+        </g>
+        
+        <!-- 流星效果 -->
+        <g>
+            <!-- 流星1 -->
+            <path d="M100,0 L250,100" stroke="#ffffff" stroke-width="1.5" opacity="0.8" filter="url(#glow)">
+                <animate attributeName="d" from="M-50,-50 L100,50" to="M100,0 L250,100" dur="3s" repeatCount="indefinite" begin="1s" />
+                <animate attributeName="opacity" values="0;0.8;0" dur="3s" repeatCount="indefinite" begin="1s" />
+            </path>
+            <!-- 流星2 -->
+            <path d="M500,-20 L650,80" stroke="#ffffff" stroke-width="1" opacity="0.6" filter="url(#glow)">
+                <animate attributeName="d" from="M350,-70 L500,30" to="M500,-20 L650,80" dur="4s" repeatCount="indefinite" begin="2.5s" />
+                <animate attributeName="opacity" values="0;0.6;0" dur="4s" repeatCount="indefinite" begin="2.5s" />
+            </path>
+            <!-- 流星3 -->
+            <path d="M900,10 L1050,110" stroke="#ffffff" stroke-width="1.2" opacity="0.7" filter="url(#glow)">
+                <animate attributeName="d" from="M750,-40 L900,60" to="M900,10 L1050,110" dur="3.5s" repeatCount="indefinite" begin="4s" />
+                <animate attributeName="opacity" values="0;0.7;0" dur="3.5s" repeatCount="indefinite" begin="4s" />
+            </path>
+        </g>
+        
+        <!-- 远山层 - 营造深远意境 -->
+        <path d="M0,360 C180,300 360,330 540,350 C720,370 900,340 1080,360 C1260,380 1440,350 1440,370 L1440,500 L0,500 Z" fill="#0a0f1f" stroke="none" opacity="0.9"/>
+        
+        <!-- 中山层 - 增加山峦起伏美感 -->
+        <path d="M0,390 C150,330 300,360 450,380 C600,400 750,370 900,390 C1050,410 1200,380 1350,400 L1440,410 L1440,500 L0,500 Z" fill="#0f172a" stroke="none" opacity="0.8"/>
+        
+        <!-- 近山层 - 清晰山形轮廓 -->
+        <path d="M0,420 C120,360 240,390 360,410 C480,430 600,400 720,420 C840,440 960,410 1080,430 C1200,450 1320,420 1440,440 L1440,500 L0,500 Z" fill="#1e293b" stroke="none" opacity="0.7"/>
+        
+        <!-- 山峰轮廓线 - 增强美感 -->
+        <path d="M0,360 C180,300 360,330 540,350 C720,370 900,340 1080,360 C1260,380 1440,350 1440,370" fill="none" stroke="#1e3a8a" stroke-width="1" opacity="0.3"/>
+        <path d="M0,390 C150,330 300,360 450,380 C600,400 750,370 900,390 C1050,410 1200,380 1350,400" fill="none" stroke="#3b82f6" stroke-width="1.2" opacity="0.25"/>
+        <path d="M0,420 C120,360 240,390 360,410 C480,430 600,400 720,420 C840,440 960,410 1080,430 C1200,450 1320,420 1440,440" fill="none" stroke="#60a5fa" stroke-width="1" opacity="0.2"/>
+        
+        <!-- 山峰点缀 - 增加美感 -->
+        <path d="M200,320 L220,280 L240,320" fill="none" stroke="#3b82f6" stroke-width="0.8" opacity="0.3"/>
+        <path d="M450,350 L470,310 L490,350" fill="none" stroke="#3b82f6" stroke-width="0.8" opacity="0.3"/>
+        <path d="M700,340 L720,300 L740,340" fill="none" stroke="#3b82f6" stroke-width="0.8" opacity="0.3"/>
+        <path d="M950,360 L970,320 L990,360" fill="none" stroke="#3b82f6" stroke-width="0.8" opacity="0.3"/>
+        <path d="M1200,350 L1220,310 L1240,350" fill="none" stroke="#3b82f6" stroke-width="0.8" opacity="0.3"/>
+    </svg>
+    
+    <div class="container">
+        <div class="header animate">
+            <h1>热爱可抵岁月漫长</h1>
+        </div>
+        
+        <div class="card animate delay-1">
+            <div class="intro">
+                <div id="hitokoto-container" class="hitokoto-content">
+                    <p id="hitokoto-text"></p>
+                    <p id="hitokoto-from" class="hitokoto-from"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="social-links animate delay-2">
+            <a href="https://core.slackjar.online" class="social-link" target="_blank">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M4,1H20A1,1 0 0,1 21,2V6A1,1 0 0,1 20,7H4A1,1 0 0,1 3,6V2A1,1 0 0,1 4,1M4,9H20A1,1 0 0,1 21,10V14A1,1 0 0,1 20,15H4A1,1 0 0,1 3,14V10A1,1 0 0,1 4,9M4,17H20A1,1 0 0,1 21,18V22A1,1 0 0,1 20,23H4A1,1 0 0,1 3,22V18A1,1 0 0,1 4,17M9,5H10V3H9V5M9,13H10V11H9V13M9,21H10V19H9V21M5,3V5H7V3H5M5,11V13H7V11H5M5,19V21H7V19H5Z"/>
+                </svg>
+                后台
+            </a>
+            <a href="https://wiki.slackjar.online" class="social-link" target="_blank">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                </svg>
+                文档
+            </a>
+            <a href="https://blog.slackjar.online" class="social-link" target="_blank">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19,3H5C3.89,3 3,3.89 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5C21,3.89 20.1,3 19,3M19,5V19H5V5H19M13.96,12.29L11.21,15.83L9.25,13.47L6.5,17H17.5L13.96,12.29Z"/>
+                </svg>
+                博客
+            </a>
+            <a href="https://blog.csdn.net/m0_57538148" class="social-link" target="_blank">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M10,7H14A2,2 0 0,1 16,9V15A2,2 0 0,1 14,17H10A2,2 0 0,1 8,15V9A2,2 0 0,1 10,7M10,9V15H14V9H10Z"/>
+                </svg>
+                CSDN
+            </a>
+            <a href="https://gitee.com/notre" class="social-link" target="_blank">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M11.984 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.016 0zm6.09 5.333c.328 0 .593.266.592.593v1.482a.594.594 0 0 1-.593.592H9.777c-.982 0-1.778.796-1.778 1.778v5.63h5.556a.593.593 0 0 1 .592.592v1.482a.594.594 0 0 1-.592.593H5.926a.593.593 0 0 1-.592-.593V5.926a.593.593 0 0 1 .592-.592h12.148z"/>
+                </svg>
+                Gitee
+            </a>
+            <a href="https://github.com/qmdc" class="social-link" target="_blank">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+                </svg>
+                Github
+            </a>
+            <a href="https://notre1024.lofter.com" class="social-link" target="_blank">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M9,7H11V17H9V7M13,7H15V13H13V7Z"/>
+                </svg>
+                Lofter
+            </a>
+        </div>
+    </div>
+    
+    <div class="footer animate delay-4">
+        <p>© 2025 SlackJar | <a href="https://beian.miit.gov.cn/" target="_blank" style="color: inherit; text-decoration: none;">皖ICP备2025096359号</a></p>
+    </div>
+    
+    <script>
+        // 页面加载后添加动画类
+        document.addEventListener('DOMContentLoaded', function() {
+            const animateElements = document.querySelectorAll('.animate');
+            animateElements.forEach(el => {
+                el.style.opacity = '1';
+                el.style.transform = 'translateY(0)';
+            });
+        });
+        
+        // 为链接添加平滑的悬停效果
+        const links = document.querySelectorAll('.social-link');
+        links.forEach(link => {
+            link.addEventListener('mousedown', function() {
+                this.style.transform = 'translateY(-1px)';
+            });
+            link.addEventListener('mouseup', function() {
+                this.style.transform = 'translateY(-3px)';
+            });
+        });
+        
+        // 调用hitokoto API
+        function fetchHitokoto() {
+            fetch('https://v1.hitokoto.cn')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const hitokotoText = document.getElementById('hitokoto-text');
+                    const hitokotoFrom = document.getElementById('hitokoto-from');
+                    
+                    // 添加淡入动画效果
+                    hitokotoText.style.opacity = '0';
+                    hitokotoFrom.style.opacity = '0';
+                    
+                    // 设置内容
+                    hitokotoText.textContent = data.hitokoto;
+                    hitokotoFrom.textContent = data.from ? `— 「 ${data.from} 」` : '';
+                    
+                    // 触发重排
+                    void hitokotoText.offsetWidth;
+                    void hitokotoFrom.offsetWidth;
+                    
+                    // 淡入显示
+                    hitokotoText.style.transition = 'opacity 0.5s ease-in-out';
+                    hitokotoFrom.style.transition = 'opacity 0.5s ease-in-out';
+                    hitokotoText.style.opacity = '1';
+                    hitokotoFrom.style.opacity = '1';
+                })
+                .catch(error => {
+                    console.error('There was a problem with the fetch operation:', error);
+                    const hitokotoText = document.getElementById('hitokoto-text');
+                    const hitokotoFrom = document.getElementById('hitokoto-from');
+                    hitokotoText.textContent = '思想是自由的，表达是有力量的。';
+                    hitokotoFrom.textContent = '— 网络';
+                });
+        }
+        
+        // 页面加载时获取随机句子
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchHitokoto();
+        });
+    </script>
+</body>
+</html>

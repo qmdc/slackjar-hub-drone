@@ -1,0 +1,70 @@
+spring:
+  profiles:
+    active: frp
+  application:
+    name: slackjar-service
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 200MB
+
+server:
+  port: 8024
+  servlet:
+    context-path: /slack
+
+mybatis-plus:
+  mapper-locations: classpath:mybatis/**/*.xml
+  type-aliases-package: com.slack.slackjarservice.**.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+sa-token:
+  # token 名称（同时也是 cookie 名称）
+  token-name: token
+  # token 有效期（单位：秒） 默认30天，-1 代表永久有效
+  timeout: 2592000
+  # token 最低活跃频率（单位：秒），如果 token 超过此时间没有访问系统就会被冻结，默认-1 代表不限制，永不冻结
+  active-timeout: -1
+  # 是否允许同一账号多地同时登录 （为 true 时允许一起登录, 为 false 时新登录挤掉旧登录）
+  is-concurrent: true
+  # 在多人登录同一账号时，是否共用一个 token （为 true 时所有登录共用一个 token, 为 false 时每次登录新建一个 token）
+  is-share: false
+  # token 风格（默认可取值：uuid、simple-uuid、random-32、random-64、random-128、tik）
+  token-style: random-128
+  # 是否输出操作日志
+  is-log: true
+
+system:
+  default:
+    oss:
+      active: local
+  local:
+    storage:
+      path: /Users/ppsn/Documents/trae/slack-hub-drone/file
+  yolo:
+    script:
+      path: /Users/ppsn/Documents/trae/slack-hub-drone/yolov-model/py-script/yolo_detector.py
+    model:
+      path: /Users/ppsn/Documents/trae/slack-hub-drone/yolov-model
+  python:
+    path: python3
+
+sentinel:
+  # 是否启用 Sentinel
+  enabled: true
+  # 应用名称（在控制台显示）
+  #  app-name: ${spring.application.name}
+  # 控制台地址（可选，用于实时监控和规则配置）
+  # dashboard: localhost:8080
+  # 与控制台通信端口（默认8719，自动扫描可用端口）
+  # port: 8719
+  # 控制台心跳间隔（毫秒）
+  # heartbeat-interval: 10000

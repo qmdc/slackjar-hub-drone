@@ -36,10 +36,9 @@ const ImageDetection: React.FC = () => {
 
     const handleFileUpload: UploadProps['onChange'] = async (info) => {
         if (info.file.status === 'done') {
-            const res = info.file.response as { code: number; data: { fileUrl: string } };
+            const res = info.file.response as { code: number; data: { fileUrl: string; filePath: string } };
             if (res.code === 200) {
-                setUploadedFile(res.data.fileUrl);
-                console.log('文件上传 filePath:', res.data.fileUrl)
+                setUploadedFile(res.data.filePath);
                 setOriginalImageUrl(res.data.fileUrl);
                 setResultImageUrl('');
                 setDetectionResult(null);

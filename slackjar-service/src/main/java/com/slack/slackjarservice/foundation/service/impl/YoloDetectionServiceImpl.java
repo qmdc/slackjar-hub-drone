@@ -17,6 +17,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 @Slf4j
 @Service
@@ -46,8 +47,9 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
             return result;
         }
 
-        String inputPath = storagePath + "/" + request.getFilePath();
-        String outputPath = storagePath + "/detection_result_" + System.currentTimeMillis() + ".jpg";
+        String fileKey = extractFileKey(request.getFilePath());
+        String inputPath = new File(storagePath, fileKey).getAbsolutePath();
+        String outputPath = new File(storagePath, "detection_result_" + System.currentTimeMillis() + ".jpg").getAbsolutePath();
 
         List<String> command = new ArrayList<>();
         command.add(pythonPath);
@@ -72,8 +74,9 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
             return result;
         }
 
-        String inputPath = storagePath + "/" + request.getFilePath();
-        String outputPath = storagePath + "/detection_result_" + System.currentTimeMillis() + ".mp4";
+        String fileKey = extractFileKey(request.getFilePath());
+        String inputPath = new File(storagePath, fileKey).getAbsolutePath();
+        String outputPath = new File(storagePath, "detection_result_" + System.currentTimeMillis() + ".mp4").getAbsolutePath();
 
         List<String> command = new ArrayList<>();
         command.add(pythonPath);
@@ -88,12 +91,44 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
         return executeCommand(command, outputPath);
     }
 
+    /**
+     * 从可能的URL中提取真实的文件相对路径
+     * 兼容两种格式：
+     * 1. 纯相对路径：image/1777557096656.jpg
+     * 2. 完整下载URL：/api/sys-file/local/download?filePath=image/1777557096656.jpg
+     */
+    private String extractFileKey(String filePath) {
+        if (filePath == null || filePath.isEmpty()) {
+            return filePath;
+        }
+        String prefix = "/api/sys-file/local/download?filePath=";
+        if (filePath.contains(prefix)) {
+            return filePath.substring(filePath.indexOf(prefix) + prefix.length());
+        }
+        if (filePath.contains("filePath=")) {
+            return filePath.substring(filePath.indexOf("filePath=") + "filePath=".length());
+        }
+        return filePath;
+    }
+
     private DetectionResultDTO executeCommand(List<String> command, String outputPath) {
         long startTime = System.currentTimeMillis();
         try {
             ProcessBuilder pb = new ProcessBuilder(command);
-            pb.redirectErrorStream(true);
             Process process = pb.start();
+
+            CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> {
+                StringBuilder sb = new StringBuilder();
+                try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                    String line;
+                    while ((line = errorReader.readLine()) != null) {
+                        sb.append(line).append("\n");
+                    }
+                } catch (Exception e) {
+                    sb.append("读取stderr失败: ").append(e.getMessage());
+                }
+                return sb.toString();
+            });
 
             StringBuilder output = new StringBuilder();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
@@ -104,11 +139,13 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
             }
 
             int exitCode = process.waitFor();
-            log.info("Python脚本执行完成, 退出码: {}, 输出: {}", exitCode, output);
+            String errorOutput = stderrFuture.get();
+            log.info("Python脚本执行完成, 退出码: {}, stderr: {}, stdout: {}", exitCode, errorOutput, output);
 
             DetectionResultDTO result = objectMapper.readValue(output.toString(), DetectionResultDTO.class);
             if (result.isSuccess() && outputPath != null) {
-                result.setOutputPath(outputPath.substring(storagePath.length() + 1));
+                String relativePath = outputPath.substring(new File(storagePath).getAbsolutePath().length() + 1);
+                result.setOutputPath(relativePath);
             }
             return result;
 

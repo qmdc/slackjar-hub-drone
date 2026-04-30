@@ -26,6 +26,11 @@ public class FileUploadResponse {
     private String fileUrl;
 
     /**
+     * 文件相对路径（用于后端处理）
+     */
+    private String filePath;
+
+    /**
      * 文件大小（字节）
      */
     private Long fileSize;

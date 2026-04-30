@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS detection_history (
     iou_threshold DECIMAL(5,3) COMMENT 'IoU阈值',
     process_time BIGINT COMMENT '处理时间(ms)',
     error_message TEXT COMMENT '错误信息',
-    create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    deleted TINYINT DEFAULT 0 COMMENT '删除标记(0-未删除,1-已删除)',
-    version INT DEFAULT 1 COMMENT '版本号'
+    create_time     bigint            null comment '创建时间（毫秒时间戳）',
+    update_time     bigint            null comment '更新时间（毫秒时间戳）',
+    deleted         tinyint default 0 not null comment '逻辑删除（0-未删，1-已删）',
+    version         bigint  default 1 not null comment '版本号（用于乐观锁）'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='检测历史表';

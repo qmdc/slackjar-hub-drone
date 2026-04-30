@@ -17,7 +17,7 @@ def load_model(model_path):
 def detect_image(model, image_path, conf_threshold=0.25, iou_threshold=0.45):
     """检测单张图片"""
     try:
-        results = model(image_path, conf=conf_threshold, iou=iou_threshold)
+        results = model(image_path, conf=conf_threshold, iou=iou_threshold, verbose=False)
         return process_results(results), None
     except Exception as e:
         return None, str(e)
@@ -25,7 +25,7 @@ def detect_image(model, image_path, conf_threshold=0.25, iou_threshold=0.45):
 def detect_video_frame(model, frame, conf_threshold=0.25, iou_threshold=0.45):
     """检测视频帧"""
     try:
-        results = model(frame, conf=conf_threshold, iou=iou_threshold)
+        results = model(frame, conf=conf_threshold, iou=iou_threshold, verbose=False)
         return process_results(results), None
     except Exception as e:
         return None, str(e)
@@ -47,8 +47,8 @@ def process_results(results):
                 'x2': x2,
                 'y2': y2,
                 'confidence': conf,
-                'class_id': cls,
-                'class_name': cls_name
+                'classId': cls,
+                'className': cls_name
             })
     return detections
 
@@ -57,7 +57,7 @@ def draw_detections(image, detections):
     for det in detections:
         x1, y1, x2, y2 = int(det['x1']), int(det['y1']), int(det['x2']), int(det['y2'])
         conf = det['confidence']
-        cls_name = det['class_name']
+        cls_name = det['className']
         
         cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
         label = f"{cls_name}: {conf:.2f}"
@@ -145,7 +145,7 @@ def main():
             
             if output_path:
                 save_result_image(image_path, detections, output_path)
-                result['output_path'] = output_path
+                result['outputPath'] = output_path
             
             print(json.dumps(result))
     
@@ -169,8 +169,8 @@ def main():
         print(json.dumps({
             'success': True,
             'detections': detections,
-            'total_frames': len(set(d['frame'] for d in detections)) if detections else 0,
-            'output_path': output_path
+            'totalFrames': len(set(d['frame'] for d in detections)) if detections else 0,
+            'outputPath': output_path
         }))
     
     elif command == 'list_models':
@@ -206,7 +206,7 @@ def main():
             confidences = []
             
             for det in detections:
-                cls_name = det['class_name']
+                cls_name = det['className']
                 class_counts[cls_name] = class_counts.get(cls_name, 0) + 1
                 confidences.append(det['confidence'])
             

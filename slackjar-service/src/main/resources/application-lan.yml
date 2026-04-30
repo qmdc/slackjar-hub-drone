@@ -47,4 +47,4 @@ system:
     model:
       path: E:\\project\\trae\\slackjar-hub-drone\\yolov-model
   python:
-    path: python3
+    path: python

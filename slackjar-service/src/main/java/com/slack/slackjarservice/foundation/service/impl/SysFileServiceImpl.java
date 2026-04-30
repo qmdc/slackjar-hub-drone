@@ -118,6 +118,7 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileDao, SysFile> impleme
         response.setFileId(fileId);
         response.setFileName(fileKey.substring(fileKey.lastIndexOf("/") + 1));
         response.setFileUrl(getFileUrl(fileKey));
+        response.setFilePath(fileKey);
         response.setFileSize(fileSize);
         response.setFileType(contentType);
         response.setExpired(expired);

@@ -16,7 +16,6 @@ public enum PushWithBackendEnum {
     FAIL_STRING_NOTICE("FAIL_STRING_NOTICE", "失败-普通字符串通知消息"),
     // IP地级市信息
     IP_CITY_INFO("IP_CITY_INFO", "IP地级市信息"),
-    // 视频检测帧推送
     VIDEO_DETECTION_FRAME("VIDEO_DETECTION_FRAME", "视频检测帧推送"),
     ;
 

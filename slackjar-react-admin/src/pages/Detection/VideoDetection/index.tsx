@@ -1,24 +1,17 @@
-import React, {useState, useEffect, useCallback, useRef} from 'react';
-import {Button, Upload, InputNumber, Select, Card, message, Tag, Statistic, Row, Col, Progress} from 'antd';
-import {UploadOutlined, PlayCircleOutlined, RestOutlined, VideoCameraOutlined} from '@ant-design/icons';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
+import {Button, Upload, InputNumber, Select, Card, message, Statistic, Row, Col, Progress} from 'antd';
+import {UploadOutlined, PlayCircleOutlined, PauseCircleOutlined, VideoCameraOutlined} from '@ant-design/icons';
 import type {UploadProps} from 'antd';
-import {listModels, detectVideo, type ModelInfo} from '../../../apis/modules/detection';
-import {useAuthStore} from '../../../store/authStore';
+import {
+    listModels,
+    detectVideo,
+    pauseDetection,
+    resumeDetection,
+    type ModelInfo
+} from '../../../apis/modules/detection';
 import {socketManager} from '../../../socketio';
-import type {SocketMessageDTO} from '../../../socketio/types';
-
-interface FrameData {
-    type: string
-    taskId: string
-    frameIndex?: number
-    totalFrames?: number
-    detectionCount?: number
-    processTime?: number
-    message?: string
-    fps?: number
-    width?: number
-    height?: number
-}
+import {PushWithBackendEnum, type SocketMessageDTO} from '../../../socketio/types';
+import {useAuthStore} from '../../../store/authStore';
 
 const VideoDetection: React.FC = () => {
     const [models, setModels] = useState<ModelInfo[]>([]);
@@ -29,22 +22,71 @@ const VideoDetection: React.FC = () => {
     const [originalVideoUrl, setOriginalVideoUrl] = useState<string>('');
     const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(false);
+    const [paused, setPaused] = useState(false);
     const [progress, setProgress] = useState(0);
     const [totalFrames, setTotalFrames] = useState(0);
     const [currentFrame, setCurrentFrame] = useState(0);
     const [totalDetections, setTotalDetections] = useState(0);
     const [processTime, setProcessTime] = useState(0);
     const [completed, setCompleted] = useState(false);
-    const frameHandlerRef = useRef<((msg: SocketMessageDTO) => void) | null>(null);
+    const [taskId, setTaskId] = useState<string>('');
+
+    const socketHandlerRef = useRef<(msg: SocketMessageDTO) => void | null>(null);
 
     useEffect(() => {
         loadModels();
         return () => {
-            if (frameHandlerRef.current) {
-                socketManager.unregisterHandler('VIDEO_DETECTION_FRAME', frameHandlerRef.current);
-            }
+            unregisterSocketHandler();
         };
     }, []);
+
+    const registerSocketHandler = useCallback((tid: string) => {
+        unregisterSocketHandler();
+
+        const handler = (messageDTO: SocketMessageDTO) => {
+            const data = messageDTO.content;
+            if (!data || data.taskId !== tid) return;
+
+            const type = data.type;
+
+            if (type === 'start') {
+                setTotalFrames(data.totalFrames || 0);
+            } else if (type === 'frame') {
+                setCurrentFrame(data.currentFrame || 0);
+                setTotalFrames(data.totalFrames || 0);
+                setTotalDetections(data.totalDetections || 0);
+                if (data.totalFrames > 0) {
+                    setProgress(Math.round((data.currentFrame * 100) / data.totalFrames));
+                }
+            } else if (type === 'complete') {
+                setLoading(false);
+                setCompleted(true);
+                setCurrentFrame(data.currentFrame || 0);
+                setTotalFrames(data.totalFrames || 0);
+                setTotalDetections(data.totalDetections || 0);
+                setProcessTime(data.processTime || 0);
+                setProgress(100);
+                message.success('视频检测完成');
+                unregisterSocketHandler();
+            } else if (type === 'error') {
+                setLoading(false);
+                setCompleted(false);
+                setStreamUrl('');
+                message.error('检测失败: ' + (data.message || '未知错误'));
+                unregisterSocketHandler();
+            }
+        };
+
+        socketHandlerRef.current = handler;
+        socketManager.registerHandler(PushWithBackendEnum.VIDEO_DETECTION_FRAME, handler);
+    }, []);
+
+    const unregisterSocketHandler = () => {
+        if (socketHandlerRef.current) {
+            socketManager.unregisterHandler(PushWithBackendEnum.VIDEO_DETECTION_FRAME, socketHandlerRef.current);
+            socketHandlerRef.current = null;
+        }
+    };
 
     const loadModels = async () => {
         try {
@@ -55,54 +97,10 @@ const VideoDetection: React.FC = () => {
                     setSelectedModel(res.data[0].name);
                 }
             }
-        } catch (e) {
+        } catch {
             message.error('加载模型列表失败');
         }
     };
-
-    const handleFrameMessage = useCallback((msg: SocketMessageDTO) => {
-        const data = msg.content as FrameData;
-        if (!data) return;
-
-        switch (data.type) {
-            case 'start':
-                setTotalFrames(data.totalFrames || 0);
-                setProgress(0);
-                setCurrentFrame(0);
-                setTotalDetections(0);
-                setCompleted(false);
-                break;
-            case 'frame':
-                if (data.frameIndex !== undefined && data.totalFrames) {
-                    setCurrentFrame(data.frameIndex + 1);
-                    setProgress(Math.round(((data.frameIndex + 1) / data.totalFrames) * 100));
-                }
-                if (data.detectionCount !== undefined) {
-                    setTotalDetections(prev => prev + data.detectionCount!);
-                }
-                break;
-            case 'complete':
-                setProgress(100);
-                setLoading(false);
-                setCompleted(true);
-                if (data.processTime) {
-                    setProcessTime(data.processTime);
-                }
-                message.success('视频检测完成');
-                break;
-            case 'error':
-                setLoading(false);
-                setCompleted(false);
-                setStreamUrl('');
-                message.error(data.message || '检测失败');
-                break;
-        }
-    }, []);
-
-    useEffect(() => {
-        frameHandlerRef.current = handleFrameMessage;
-        socketManager.registerHandler('VIDEO_DETECTION_FRAME', handleFrameMessage);
-    }, [handleFrameMessage]);
 
     const handleFileUpload: UploadProps['onChange'] = async (info) => {
         if (info.file.status === 'done') {
@@ -132,8 +130,10 @@ const VideoDetection: React.FC = () => {
         setLoading(true);
         setProgress(0);
         setCurrentFrame(0);
+        setTotalFrames(0);
         setTotalDetections(0);
         setCompleted(false);
+        setPaused(false);
         setStreamUrl('');
 
         try {
@@ -145,15 +145,44 @@ const VideoDetection: React.FC = () => {
             });
 
             if (res.code === 200 && res.data?.taskId) {
-                setStreamUrl(`/api/yolo/stream/${res.data.taskId}`);
+                const tid = res.data.taskId;
+                setTaskId(tid);
+                setStreamUrl(`/api/yolo/stream/${tid}`);
+                registerSocketHandler(tid);
                 message.info('检测已启动，实时接收结果...');
             } else {
                 setLoading(false);
                 message.error('启动检测失败');
             }
-        } catch (e) {
+        } catch {
             setLoading(false);
             message.error('启动检测失败');
+        }
+    };
+
+    const handlePause = async () => {
+        if (!taskId) return;
+        try {
+            const res = await pauseDetection(taskId);
+            if (res.code === 200) {
+                setPaused(true);
+                message.info('检测已暂停');
+            }
+        } catch {
+            message.error('暂停失败');
+        }
+    };
+
+    const handleResume = async () => {
+        if (!taskId) return;
+        try {
+            const res = await resumeDetection(taskId);
+            if (res.code === 200) {
+                setPaused(false);
+                message.info('检测已恢复');
+            }
+        } catch {
+            message.error('恢复失败');
         }
     };
 
@@ -210,12 +239,11 @@ const VideoDetection: React.FC = () => {
                                 style={{width: '100%'}}
                             />
                         </Col>
-                        <Col span={2} style={{display: 'flex', alignItems: 'flex-end'}}>
+                        <Col span={2} style={{display: 'flex', alignItems: 'flex-end', gap: 4}}>
                             <Button
                                 type="primary"
-                                icon={loading ? <RestOutlined spin/> : <VideoCameraOutlined/>}
+                                icon={<VideoCameraOutlined/>}
                                 onClick={handleDetect}
-                                loading={loading}
                                 disabled={loading}
                             >
                                 检测
@@ -223,12 +251,21 @@ const VideoDetection: React.FC = () => {
                         </Col>
                     </Row>
                     {loading && (
-                        <Progress
-                            percent={progress}
-                            status="active"
-                            style={{marginTop: 16}}
-                            format={() => `${currentFrame}/${totalFrames} 帧`}
-                        />
+                        <div style={{marginTop: 16, display: 'flex', alignItems: 'center', gap: 12}}>
+                            <Progress
+                                percent={progress}
+                                status={paused ? 'normal' : 'active'}
+                                style={{flex: 1}}
+                                format={() => `${currentFrame}/${totalFrames} 帧`}
+                            />
+                            <Button
+                                icon={paused ? <PlayCircleOutlined/> : <PauseCircleOutlined/>}
+                                onClick={paused ? handleResume : handlePause}
+                                size="small"
+                            >
+                                {paused ? '恢复' : '暂停'}
+                            </Button>
+                        </div>
                     )}
                 </div>
 

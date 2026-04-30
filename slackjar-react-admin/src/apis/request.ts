@@ -78,10 +78,10 @@ request.interceptors.response.use(
                     }, 800)
                     break
                 case 403:
-                    window.location.href = '/error/403'
+                    message.error('暂无操作权限').then()
                     break
                 case 500:
-                    window.location.href = '/error/500'
+                    message.error('服务端异常').then()
                     break
                 default:
                     console.error('请求失败:', error.response.data?.message || error.message)

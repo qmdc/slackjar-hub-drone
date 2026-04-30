@@ -33,6 +33,18 @@ export function getDetectionStats(id: number): Promise<ResponseData<DetectionSta
     return request.get(`/yolo/stats/${id}`)
 }
 
+export function getDetectionStatus(taskId: string): Promise<ResponseData<DetectionStatus>> {
+    return request.get(`/yolo/status/${taskId}`)
+}
+
+export function pauseDetection(taskId: string): Promise<ResponseData<void>> {
+    return request.post(`/yolo/pause/${taskId}`)
+}
+
+export function resumeDetection(taskId: string): Promise<ResponseData<void>> {
+    return request.post(`/yolo/resume/${taskId}`)
+}
+
 export interface ModelInfo {
     name: string
     path: string
@@ -97,4 +109,16 @@ export interface DetectionStats {
     classDistribution: string
     classCounts: Record<string, number>
     confidenceList: number[]
+}
+
+export interface DetectionStatus {
+    taskId: string
+    currentFrame: number
+    totalFrames: number
+    totalDetections: number
+    processTime: number
+    complete: boolean
+    error: boolean
+    paused: boolean
+    progress: number
 }

@@ -1,7 +1,7 @@
-package com.slack.slackjarservice.foundation.dao;
+package com.slack.slackjarservice.drone.dao;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.slack.slackjarservice.foundation.entity.DetectionHistory;
+import com.slack.slackjarservice.drone.entity.DetectionHistory;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper

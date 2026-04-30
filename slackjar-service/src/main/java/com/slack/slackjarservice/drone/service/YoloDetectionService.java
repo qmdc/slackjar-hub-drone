@@ -1,9 +1,9 @@
-package com.slack.slackjarservice.foundation.service;
+package com.slack.slackjarservice.drone.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.slack.slackjarservice.foundation.entity.DetectionHistory;
-import com.slack.slackjarservice.foundation.model.dto.DetectionResultDTO;
-import com.slack.slackjarservice.foundation.model.request.DetectionRequest;
+import com.slack.slackjarservice.drone.entity.DetectionHistory;
+import com.slack.slackjarservice.drone.model.dto.DetectionResultDTO;
+import com.slack.slackjarservice.drone.model.request.DetectionRequest;
 
 import java.util.List;
 import java.util.Map;

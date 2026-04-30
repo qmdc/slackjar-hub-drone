@@ -4,6 +4,7 @@ import cn.dev33.satoken.interceptor.SaInterceptor;
 import cn.dev33.satoken.stp.StpUtil;
 import com.slack.slackjarservice.common.constant.CommonConstants;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -25,6 +26,11 @@ public class SaTokenConfig implements WebMvcConfigurer {
                 .excludePathPatterns(CommonConstants.SA_TOKEN_EXCLUDE_PATH_PATTERNS)
                 // 拦截所有接口
                 .addPathPatterns("/**");
+    }
+
+    @Override
+    public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
+        configurer.setDefaultTimeout(0);
     }
 
 }

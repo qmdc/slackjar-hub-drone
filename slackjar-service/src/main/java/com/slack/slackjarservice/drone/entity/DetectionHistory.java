@@ -1,4 +1,4 @@
-package com.slack.slackjarservice.foundation.entity;
+package com.slack.slackjarservice.drone.entity;
 
 import com.slack.slackjarservice.common.base.BaseModel;
 import com.baomidou.mybatisplus.annotation.TableName;

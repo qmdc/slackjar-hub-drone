@@ -1,18 +1,18 @@
-package com.slack.slackjarservice.foundation.service.impl;
+package com.slack.slackjarservice.drone.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.slackjarservice.common.enumtype.foundation.PushWithBackendEnum;
-import com.slack.slackjarservice.foundation.dao.DetectionHistoryDao;
-import com.slack.slackjarservice.foundation.entity.DetectionHistory;
-import com.slack.slackjarservice.foundation.model.dto.DetectionResultDTO;
+import com.slack.slackjarservice.drone.dao.DetectionHistoryDao;
+import com.slack.slackjarservice.drone.entity.DetectionHistory;
+import com.slack.slackjarservice.drone.model.dto.DetectionResultDTO;
+import com.slack.slackjarservice.drone.model.request.DetectionRequest;
+import com.slack.slackjarservice.drone.service.YoloDetectionService;
+import com.slack.slackjarservice.drone.stream.DetectionFrameTracker;
 import com.slack.slackjarservice.foundation.model.dto.SocketMessageDTO;
-import com.slack.slackjarservice.foundation.model.request.DetectionRequest;
-import com.slack.slackjarservice.foundation.service.YoloDetectionService;
 import com.slack.slackjarservice.foundation.socketio.BackendMessagePush;
-import com.slack.slackjarservice.foundation.socketio.DetectionFrameTracker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -22,6 +22,10 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -42,6 +46,11 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final BackendMessagePush backendMessagePush;
     private final DetectionFrameTracker frameTracker;
+    private final ScheduledExecutorService progressLogger = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "detection-progress-logger");
+        t.setDaemon(true);
+        return t;
+    });
 
     public YoloDetectionServiceImpl(BackendMessagePush backendMessagePush, DetectionFrameTracker frameTracker) {
         this.backendMessagePush = backendMessagePush;
@@ -132,6 +141,17 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
                 ProcessBuilder pb = new ProcessBuilder(command);
                 Process process = pb.start();
 
+                frameTracker.getSession(taskId).setProcess(process);
+
+                ScheduledFuture<?> progressLogTask = progressLogger.scheduleAtFixedRate(() -> {
+                    DetectionFrameTracker.FrameSession s = frameTracker.getSession(taskId);
+                    if (s != null && !s.isDestroyed()) {
+                        log.info("[检测进度] taskId={}, 帧={}/{}, 检测目标数={}, 耗时={}ms",
+                                taskId, s.getCurrentFrameIndex(), s.getTotalFrames(),
+                                s.getTotalDetections(), System.currentTimeMillis() - startTime);
+                    }
+                }, 5, 5, TimeUnit.SECONDS);
+
                 CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> {
                     StringBuilder sb = new StringBuilder();
                     try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
@@ -148,18 +168,49 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     String line;
                     while ((line = reader.readLine()) != null) {
+                        DetectionFrameTracker.FrameSession currentSession = frameTracker.getSession(taskId);
+                        if (currentSession == null || currentSession.isDestroyed()) {
+                            log.info("[检测中断] taskId={}, 客户端已断开", taskId);
+                            break;
+                        }
+                        while (currentSession != null && currentSession.isPaused()) {
+                            Thread.sleep(200);
+                            currentSession = frameTracker.getSession(taskId);
+                            if (currentSession == null || currentSession.isDestroyed()) {
+                                break;
+                            }
+                        }
+                        if (currentSession == null || currentSession.isDestroyed()) {
+                            break;
+                        }
+
                         try {
                             Map<String, Object> frameData = objectMapper.readValue(line, Map.class);
                             String type = (String) frameData.get("type");
 
-                            if ("frame".equals(type)) {
+                            if ("start".equals(type)) {
+                                Object totalFramesObj = frameData.get("totalFrames");
+                                if (totalFramesObj instanceof Number) {
+                                    frameTracker.getSession(taskId).setTotalFrames(((Number) totalFramesObj).intValue());
+                                }
+                            } else if ("frame".equals(type)) {
                                 String framePath = (String) frameData.get("framePath");
                                 if (framePath != null) {
                                     frameTracker.addFrame(taskId, framePath);
                                 }
+                                Object detectionCountObj = frameData.get("detectionCount");
+                                if (detectionCountObj instanceof Number) {
+                                    frameTracker.getSession(taskId).addDetections(((Number) detectionCountObj).intValue());
+                                }
                             }
 
                             frameData.put("taskId", taskId);
+                            DetectionFrameTracker.FrameSession session = frameTracker.getSession(taskId);
+                            if (session != null) {
+                                frameData.put("currentFrame", session.getCurrentFrameIndex());
+                                frameData.put("totalFrames", session.getTotalFrames());
+                                frameData.put("totalDetections", session.getTotalDetections());
+                            }
                             SocketMessageDTO message = new SocketMessageDTO(frameData, PushWithBackendEnum.VIDEO_DETECTION_FRAME.getCode());
                             backendMessagePush.pushMessageToUser(userId, message);
                         } catch (Exception e) {
@@ -169,14 +220,31 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
                 }
 
                 process.waitFor();
+                progressLogTask.cancel(false);
                 String stderrOutput = stderrFuture.get();
                 log.info("流式视频检测完成, taskId: {}, stderr: {}", taskId, stderrOutput);
 
+                long processTime = System.currentTimeMillis() - startTime;
+                DetectionFrameTracker.FrameSession session = frameTracker.getSession(taskId);
+                int finalCurrentFrame = 0;
+                int finalTotalFrames = 0;
+                int finalTotalDetections = 0;
+                if (session != null) {
+                    session.setProcessTime(processTime);
+                    finalCurrentFrame = session.getCurrentFrameIndex();
+                    finalTotalFrames = session.getTotalFrames();
+                    finalTotalDetections = session.getTotalDetections();
+                }
                 frameTracker.markComplete(taskId);
 
-                long processTime = System.currentTimeMillis() - startTime;
+                log.info("[检测完成] taskId={}, 帧={}/{}, 目标数={}, 耗时={}ms", taskId, finalCurrentFrame, finalTotalFrames, finalTotalDetections, processTime);
+
                 SocketMessageDTO completeMsg = new SocketMessageDTO(
-                        Map.of("type", "complete", "taskId", taskId, "processTime", processTime),
+                        Map.of("type", "complete", "taskId", taskId,
+                                "currentFrame", finalCurrentFrame,
+                                "totalFrames", finalTotalFrames,
+                                "totalDetections", finalTotalDetections,
+                                "processTime", processTime),
                         PushWithBackendEnum.VIDEO_DETECTION_FRAME.getCode()
                 );
                 backendMessagePush.pushMessageToUser(userId, completeMsg);
@@ -195,12 +263,6 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
         return taskId;
     }
 
-    /**
-     * 从可能的URL中提取真实的文件相对路径
-     * 兼容两种格式：
-     * 1. 纯相对路径：image/1777557096656.jpg
-     * 2. 完整下载URL：/api/sys-file/local/download?filePath=image/1777557096656.jpg
-     */
     private String extractFileKey(String filePath) {
         if (filePath == null || filePath.isEmpty()) {
             return filePath;

@@ -1,12 +1,12 @@
-package com.slack.slackjarservice.foundation.controller;
+package com.slack.slackjarservice.drone.controller;
 
 import com.slack.slackjarservice.common.base.BaseController;
 import com.slack.slackjarservice.common.response.ApiResponse;
-import com.slack.slackjarservice.foundation.entity.DetectionHistory;
-import com.slack.slackjarservice.foundation.model.dto.DetectionResultDTO;
-import com.slack.slackjarservice.foundation.model.request.DetectionRequest;
-import com.slack.slackjarservice.foundation.service.YoloDetectionService;
-import com.slack.slackjarservice.foundation.socketio.DetectionFrameTracker;
+import com.slack.slackjarservice.drone.entity.DetectionHistory;
+import com.slack.slackjarservice.drone.model.dto.DetectionResultDTO;
+import com.slack.slackjarservice.drone.model.request.DetectionRequest;
+import com.slack.slackjarservice.drone.service.YoloDetectionService;
+import com.slack.slackjarservice.drone.stream.DetectionFrameTracker;
 import cn.dev33.satoken.stp.StpUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -16,6 +16,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -48,13 +49,13 @@ public class YoloController extends BaseController {
         long startTime = System.currentTimeMillis();
         try {
             DetectionResultDTO result = detectionService.detectImage(request);
-            
+
             long processTime = System.currentTimeMillis() - startTime;
-            detectionService.saveDetectionResult("IMAGE", request.getModelName(), 
-                    request.getFilePath(), request.getFilePath(), 
-                    result.getOutputPath(), result, 
+            detectionService.saveDetectionResult("IMAGE", request.getModelName(),
+                    request.getFilePath(), request.getFilePath(),
+                    result.getOutputPath(), result,
                     request.getConfThreshold(), request.getIouThreshold(), processTime);
-            
+
             return success(result);
         } catch (Exception e) {
             log.error("图片检测失败", e);
@@ -141,6 +142,48 @@ public class YoloController extends BaseController {
         }
     }
 
+    @GetMapping("/status/{taskId}")
+    public ApiResponse<Map<String, Object>> getDetectionStatus(@PathVariable String taskId) {
+        DetectionFrameTracker.FrameSession session = frameTracker.getSession(taskId);
+        if (session == null) {
+            return error("检测任务不存在");
+        }
+
+        Map<String, Object> status = new HashMap<>();
+        status.put("taskId", taskId);
+        status.put("currentFrame", session.getCurrentFrameIndex());
+        status.put("totalFrames", session.getTotalFrames());
+        status.put("totalDetections", session.getTotalDetections());
+        status.put("processTime", session.getProcessTime());
+        status.put("complete", session.isComplete());
+        status.put("error", session.isError());
+        status.put("paused", session.isPaused());
+
+        if (session.getTotalFrames() > 0) {
+            status.put("progress", Math.round((session.getCurrentFrameIndex() * 100.0) / session.getTotalFrames()));
+        } else {
+            status.put("progress", 0);
+        }
+
+        return success(status);
+    }
+
+    @PostMapping("/pause/{taskId}")
+    public ApiResponse<Void> pauseDetection(@PathVariable String taskId) {
+        if (frameTracker.pauseSession(taskId)) {
+            return success();
+        }
+        return error("暂停失败，任务不存在或已完成");
+    }
+
+    @PostMapping("/resume/{taskId}")
+    public ApiResponse<Void> resumeDetection(@PathVariable String taskId) {
+        if (frameTracker.resumeSession(taskId)) {
+            return success();
+        }
+        return error("恢复失败，任务不存在或未暂停");
+    }
+
     @GetMapping("/stream/{taskId}")
     public ResponseEntity<StreamingResponseBody> streamDetection(@PathVariable String taskId) {
         DetectionFrameTracker.FrameSession session = frameTracker.getSession(taskId);
@@ -152,9 +195,22 @@ public class YoloController extends BaseController {
 
         StreamingResponseBody body = outputStream -> {
             int lastIndex = -1;
+            boolean wasPaused = false;
             try {
                 while (true) {
+                    if (session.isPaused()) {
+                        wasPaused = true;
+                        Thread.sleep(100);
+                        continue;
+                    }
+
                     List<String> framePaths = session.getFramePaths();
+
+                    if (wasPaused && framePaths.size() > 0) {
+                        lastIndex = framePaths.size() - 1;
+                        wasPaused = false;
+                    }
+
                     for (int i = lastIndex + 1; i < framePaths.size(); i++) {
                         File frameFile = new File(framePaths.get(i));
                         if (frameFile.exists()) {
@@ -184,11 +240,15 @@ public class YoloController extends BaseController {
                 Thread.currentThread().interrupt();
             } catch (Exception e) {
                 log.warn("MJPEG流中断: taskId={}, error={}", taskId, e.getMessage());
+                frameTracker.destroySession(taskId);
             } finally {
                 try {
                     outputStream.write(("--" + boundary + "--\r\n").getBytes());
                     outputStream.flush();
                 } catch (Exception ignored) {
+                }
+                if (!session.isComplete()) {
+                    frameTracker.destroySession(taskId);
                 }
             }
         };

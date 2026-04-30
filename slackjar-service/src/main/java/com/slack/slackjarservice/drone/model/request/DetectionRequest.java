@@ -1,4 +1,4 @@
-package com.slack.slackjarservice.foundation.model.request;
+package com.slack.slackjarservice.drone.model.request;
 
 import lombok.Data;
 

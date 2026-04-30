@@ -1,6 +1,6 @@
 spring:
   profiles:
-    active: frp
+    active: lan
   application:
     name: slackjar-service
   servlet:
@@ -9,7 +9,7 @@ spring:
       max-request-size: 200MB
 
 server:
-  port: 8024
+  port: 8025
   servlet:
     context-path: /slack
 
@@ -41,21 +41,6 @@ sa-token:
   token-style: random-128
   # 是否输出操作日志
   is-log: true
-
-system:
-  default:
-    oss:
-      active: local
-  local:
-    storage:
-      path: /Users/ppsn/Documents/trae/slack-hub-drone/file
-  yolo:
-    script:
-      path: /Users/ppsn/Documents/trae/slack-hub-drone/yolov-model/py-script/yolo_detector.py
-    model:
-      path: /Users/ppsn/Documents/trae/slack-hub-drone/yolov-model
-  python:
-    path: python3
 
 sentinel:
   # 是否启用 Sentinel

@@ -11,7 +11,7 @@ export default defineConfig({
     server: {
         proxy: {
             '/api': {
-                target: 'http://127.0.0.1:8024/slack',
+                target: 'http://127.0.0.1:8025/slack',
                 // target: 'http://106.54.26.72:8025/slack',
                 // target: 'http://192.168.1.110:8025/slack',
                 changeOrigin: true,

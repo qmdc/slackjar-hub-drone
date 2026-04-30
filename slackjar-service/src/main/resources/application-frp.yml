@@ -32,4 +32,19 @@ spring:
 
 socketio:
   host: 127.0.0.1
-  port: 9092
+  port: 9093
+
+system:
+  default:
+    oss:
+      active: local
+  local:
+    storage:
+      path: /Users/ppsn/Documents/trae/slack-hub-drone/file
+  yolo:
+    script:
+      path: /Users/ppsn/Documents/trae/slack-hub-drone/yolov-model/py-script/yolo_detector.py
+    model:
+      path: /Users/ppsn/Documents/trae/slack-hub-drone/yolov-model
+  python:
+    path: python3

@@ -19,27 +19,50 @@ const MySider: React.FC = () => {
 
     // 计算当前应该选中的菜单项（支持多级菜单）
     let selectMenuKeys: string[] = [];
-    if (childMenuItems) {
+    if (childMenuItems && childMenuItems.length > 0) {
         let menuItems = childMenuItems;
+        let currentPath = pathname;
+
         // 逐级遍历菜单树，找到所有匹配的父级菜单
-        while (menuItems) {
-            let needMatchChildren = false;
+        while (menuItems && menuItems.length > 0) {
+            let matched = false;
             for (let menuItem of menuItems) {
-                // 判断当前路径是否匹配该菜单项
-                if (pathname.startsWith(menuItem!.key + "/") || pathname === menuItem!.key) {
-                    selectMenuKeys.push(menuItem!.key as string);
+                const itemKey = menuItem!.key as string;
+                // 判断当前路径是否匹配该菜单项或其子路径
+                if (currentPath === itemKey || currentPath.startsWith(itemKey + "/")) {
+                    selectMenuKeys.push(itemKey);
                     // 如果该菜单项有子菜单，继续向下匹配
-                    if (menuItem.children) {
-                        needMatchChildren = true;
+                    if (menuItem.children && menuItem.children.length > 0) {
+                        matched = true;
                         menuItems = menuItem.children;
                         break;
                     }
                 }
             }
-            // 如果没有子菜单需要匹配，退出循环
-            if (!needMatchChildren) {
+            // 如果没有匹配到或者没有子菜单，退出循环
+            if (!matched) {
                 break;
             }
+        }
+
+        // 如果 selectMenuKeys 为空，但存在子菜单，说明当前路径可能是父级目录
+        // 需要找到第一个有 element 的叶子节点并展开其父级
+        if (selectMenuKeys.length === 0) {
+            // 尝试找到与当前路径最匹配的菜单项
+            const findMatchingKeys = (items: MenuItem[], path: string, keys: string[]): string[] => {
+                for (let item of items) {
+                    const itemKey = item!.key as string;
+                    if (path === itemKey || path.startsWith(itemKey + "/")) {
+                        keys.push(itemKey);
+                        if (item.children && item.children.length > 0) {
+                            return findMatchingKeys(item.children, path, keys);
+                        }
+                        return keys;
+                    }
+                }
+                return keys;
+            };
+            selectMenuKeys = findMatchingKeys(childMenuItems, currentPath, []);
         }
     }
 
@@ -59,8 +82,8 @@ const MySider: React.FC = () => {
                     <Layout.Sider width={200} style={{background: colorBgContainer}}>
                         <Menu
                             mode="inline"
-                            defaultSelectedKeys={selectMenuKeys}  // 默认选中的菜单项
-                            defaultOpenKeys={selectMenuKeys}       // 默认展开的菜单项
+                            selectedKeys={selectMenuKeys}  // 选中的菜单项（使用受控模式）
+                            openKeys={selectMenuKeys}       // 展开的菜单项（使用受控模式）
                             style={{height: '100%', color: "#777"}}
                             items={childMenuItems}
                             onClick={handlerItemClick}

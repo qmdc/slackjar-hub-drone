@@ -1,9 +1,9 @@
 import React, {useState, useEffect} from 'react';
-import {Button, Upload, InputNumber, Select, Card, message, Image, Spin, Tag, Statistic, Row, Col} from 'antd';
+import {Button, Upload, InputNumber, Select, Card, message, Image, Tag, Statistic, Row, Col} from 'antd';
 import {UploadOutlined, PlayCircleOutlined, RestOutlined} from '@ant-design/icons';
 import type {UploadProps} from 'antd';
-import {uploadFile} from '../../../apis/modules/file';
 import {listModels, detectImage, type ModelInfo, type DetectionResult} from '../../../apis/modules/detection';
+import {useAuthStore} from '../../../store/authStore';
 
 const ImageDetection: React.FC = () => {
     const [models, setModels] = useState<ModelInfo[]>([]);
@@ -36,9 +36,10 @@ const ImageDetection: React.FC = () => {
 
     const handleFileUpload: UploadProps['onChange'] = async (info) => {
         if (info.file.status === 'done') {
-            const res = info.file.response as { code: number; data: { fileUrl: string; filePath: string } };
+            const res = info.file.response as { code: number; data: { fileUrl: string } };
             if (res.code === 200) {
-                setUploadedFile(res.data.filePath);
+                setUploadedFile(res.data.fileUrl);
+                console.log('文件上传 filePath:', res.data.fileUrl)
                 setOriginalImageUrl(res.data.fileUrl);
                 setResultImageUrl('');
                 setDetectionResult(null);
@@ -53,6 +54,7 @@ const ImageDetection: React.FC = () => {
 
     const handleDetect = async () => {
         if (!uploadedFile || !selectedModel) {
+            console.log('请上传图片并选择模型', uploadedFile, selectedModel)
             message.warning('请上传图片并选择模型');
             return;
         }
@@ -92,6 +94,10 @@ const ImageDetection: React.FC = () => {
         return Object.entries(counts).map(([name, count]) => ({name, count}));
     };
 
+    const uploadHeaders = {
+        token: useAuthStore.getState().jwt || '',
+    };
+
     return (
         <div style={{padding: 24}}>
             <Card title="图片目标检测" style={{marginBottom: 24}}>
@@ -102,6 +108,7 @@ const ImageDetection: React.FC = () => {
                             <Upload
                                 name="file"
                                 action="/api/sys-file/upload?bizType=image"
+                                headers={uploadHeaders}
                                 onChange={handleFileUpload}
                                 accept="image/*"
                                 showUploadList={false}

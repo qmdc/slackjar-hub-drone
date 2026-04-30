@@ -3,6 +3,7 @@ import {Button, Upload, InputNumber, Select, Card, message, Tag, Statistic, Row,
 import {UploadOutlined, PlayCircleOutlined, RestOutlined, UpCircleOutlined} from '@ant-design/icons';
 import type {UploadProps} from 'antd';
 import {listModels, detectVideo, type ModelInfo, type DetectionResult} from '../../../apis/modules/detection';
+import {useAuthStore} from '../../../store/authStore';
 
 interface ChannelState {
     uploadedFile: string;
@@ -149,6 +150,10 @@ const MultiVideoDetection: React.FC = () => {
 
     const stats = getAllStats();
 
+    const uploadHeaders = {
+        token: useAuthStore.getState().jwt || '',
+    };
+
     return (
         <div style={{padding: 24}}>
             <Card title="四路视频协同检测" style={{marginBottom: 24}}>
@@ -165,6 +170,7 @@ const MultiVideoDetection: React.FC = () => {
                                 <Upload
                                     name="file"
                                     action="/api/sys-file/upload?bizType=video"
+                                    headers={uploadHeaders}
                                     onChange={handleFileUpload(index)}
                                     accept="video/*"
                                     showUploadList={false}

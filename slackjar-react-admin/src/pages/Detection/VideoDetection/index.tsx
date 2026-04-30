@@ -2,8 +2,8 @@ import React, {useState, useEffect} from 'react';
 import {Button, Upload, InputNumber, Select, Card, message, Tag, Statistic, Row, Col, Progress} from 'antd';
 import {UploadOutlined, PlayCircleOutlined, RestOutlined, VideoCameraOutlined} from '@ant-design/icons';
 import type {UploadProps} from 'antd';
-import {uploadFile} from '../../../apis/modules/file';
 import {listModels, detectVideo, type ModelInfo, type DetectionResult} from '../../../apis/modules/detection';
+import {useAuthStore} from '../../../store/authStore';
 
 const VideoDetection: React.FC = () => {
     const [models, setModels] = useState<ModelInfo[]>([]);
@@ -103,6 +103,10 @@ const VideoDetection: React.FC = () => {
         return Object.entries(counts).map(([name, count]) => ({name, count}));
     };
 
+    const uploadHeaders = {
+        token: useAuthStore.getState().jwt || '',
+    };
+
     return (
         <div style={{padding: 24}}>
             <Card title="视频目标检测" style={{marginBottom: 24}}>
@@ -113,6 +117,7 @@ const VideoDetection: React.FC = () => {
                             <Upload
                                 name="file"
                                 action="/api/sys-file/upload?bizType=video"
+                                headers={uploadHeaders}
                                 onChange={handleFileUpload}
                                 accept="video/*"
                                 showUploadList={false}

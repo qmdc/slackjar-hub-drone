@@ -46,6 +46,7 @@ export interface FileUploadResponse {
     fileId: number
     fileName: string
     fileUrl: string
+    filePath: string
     fileSize: number
     fileType: string
     thumbnailUrl?: string

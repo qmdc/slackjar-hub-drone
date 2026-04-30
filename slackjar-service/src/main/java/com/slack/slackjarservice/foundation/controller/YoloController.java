@@ -140,4 +140,61 @@ public class YoloController extends BaseController {
             return error("多路视频检测失败: " + e.getMessage());
         }
     }
+
+    @GetMapping("/stream/{taskId}")
+    public ResponseEntity<StreamingResponseBody> streamDetection(@PathVariable String taskId) {
+        DetectionFrameTracker.FrameSession session = frameTracker.getSession(taskId);
+        if (session == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        String boundary = "frame_boundary";
+
+        StreamingResponseBody body = outputStream -> {
+            int lastIndex = -1;
+            try {
+                while (true) {
+                    List<String> framePaths = session.getFramePaths();
+                    for (int i = lastIndex + 1; i < framePaths.size(); i++) {
+                        File frameFile = new File(framePaths.get(i));
+                        if (frameFile.exists()) {
+                            byte[] imageData = Files.readAllBytes(frameFile.toPath());
+
+                            outputStream.write(("--" + boundary + "\r\n").getBytes());
+                            outputStream.write("Content-Type: image/jpeg\r\n".getBytes());
+                            outputStream.write(("Content-Length: " + imageData.length + "\r\n").getBytes());
+                            outputStream.write("\r\n".getBytes());
+                            outputStream.write(imageData);
+                            outputStream.write("\r\n".getBytes());
+                            outputStream.flush();
+                        }
+                        lastIndex = i;
+                    }
+
+                    if (session.isComplete() && lastIndex >= framePaths.size() - 1) {
+                        break;
+                    }
+                    if (session.isError()) {
+                        break;
+                    }
+
+                    Thread.sleep(30);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                log.warn("MJPEG流中断: taskId={}, error={}", taskId, e.getMessage());
+            } finally {
+                try {
+                    outputStream.write(("--" + boundary + "--\r\n").getBytes());
+                    outputStream.flush();
+                } catch (Exception ignored) {
+                }
+            }
+        };
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("multipart/x-mixed-replace; boundary=" + boundary))
+                .body(body);
+    }
 }

@@ -120,6 +120,17 @@ class SocketManager {
         }
     }
 
+    unregisterHandler(bizType: string, handler: MessageHandler): void {
+        const existingHandlers = this.handlers.get(bizType);
+        if (existingHandlers) {
+            const index = existingHandlers.indexOf(handler);
+            if (index !== -1) {
+                existingHandlers.splice(index, 1);
+                console.log(`[Socket] 注销处理器: ${bizType}`);
+            }
+        }
+    }
+
     /**
      * 断开Socket连接
      */

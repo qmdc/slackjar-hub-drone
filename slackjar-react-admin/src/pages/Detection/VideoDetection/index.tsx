@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useRef, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {Button, Upload, InputNumber, Select, Card, message, Tag, Statistic, Row, Col, Progress} from 'antd';
 import {UploadOutlined, PlayCircleOutlined, RestOutlined, VideoCameraOutlined} from '@ant-design/icons';
 import type {UploadProps} from 'antd';
@@ -12,7 +12,6 @@ interface FrameData {
     taskId: string
     frameIndex?: number
     totalFrames?: number
-    frameUrl?: string
     detectionCount?: number
     processTime?: number
     message?: string
@@ -28,7 +27,7 @@ const VideoDetection: React.FC = () => {
     const [iouThreshold, setIouThreshold] = useState(0.45);
     const [uploadedFile, setUploadedFile] = useState<string>('');
     const [originalVideoUrl, setOriginalVideoUrl] = useState<string>('');
-    const [currentFrameUrl, setCurrentFrameUrl] = useState<string>('');
+    const [streamUrl, setStreamUrl] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
     const [totalFrames, setTotalFrames] = useState(0);
@@ -42,7 +41,7 @@ const VideoDetection: React.FC = () => {
         loadModels();
         return () => {
             if (frameHandlerRef.current) {
-                socketManager.registerHandler('VIDEO_DETECTION_FRAME', frameHandlerRef.current);
+                socketManager.unregisterHandler('VIDEO_DETECTION_FRAME', frameHandlerRef.current);
             }
         };
     }, []);
@@ -74,9 +73,6 @@ const VideoDetection: React.FC = () => {
                 setCompleted(false);
                 break;
             case 'frame':
-                if (data.frameUrl) {
-                    setCurrentFrameUrl(data.frameUrl + '&_t=' + Date.now());
-                }
                 if (data.frameIndex !== undefined && data.totalFrames) {
                     setCurrentFrame(data.frameIndex + 1);
                     setProgress(Math.round(((data.frameIndex + 1) / data.totalFrames) * 100));
@@ -97,6 +93,7 @@ const VideoDetection: React.FC = () => {
             case 'error':
                 setLoading(false);
                 setCompleted(false);
+                setStreamUrl('');
                 message.error(data.message || '检测失败');
                 break;
         }
@@ -113,7 +110,7 @@ const VideoDetection: React.FC = () => {
             if (res.code === 200) {
                 setUploadedFile(res.data.filePath);
                 setOriginalVideoUrl(res.data.fileUrl);
-                setCurrentFrameUrl('');
+                setStreamUrl('');
                 setCompleted(false);
                 setProgress(0);
                 setTotalDetections(0);
@@ -137,7 +134,7 @@ const VideoDetection: React.FC = () => {
         setCurrentFrame(0);
         setTotalDetections(0);
         setCompleted(false);
-        setCurrentFrameUrl('');
+        setStreamUrl('');
 
         try {
             const res = await detectVideo({
@@ -148,6 +145,7 @@ const VideoDetection: React.FC = () => {
             });
 
             if (res.code === 200 && res.data?.taskId) {
+                setStreamUrl(`/api/yolo/stream/${res.data.taskId}`);
                 message.info('检测已启动，实时接收结果...');
             } else {
                 setLoading(false);
@@ -259,19 +257,19 @@ const VideoDetection: React.FC = () => {
                     </Col>
                     <Col span={12}>
                         <div style={{
-                            border: currentFrameUrl ? 'none' : '1px dashed #d9d9d9',
+                            border: streamUrl ? 'none' : '1px dashed #d9d9d9',
                             borderRadius: 6,
-                            padding: currentFrameUrl ? 0 : 48,
+                            padding: streamUrl ? 0 : 48,
                             textAlign: 'center',
                             minHeight: 320,
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center'
                         }}>
-                            {currentFrameUrl ? (
+                            {streamUrl ? (
                                 <img
-                                    src={currentFrameUrl}
-                                    alt="检测结果"
+                                    src={streamUrl}
+                                    alt="实时检测"
                                     style={{width: '100%', height: '100%', objectFit: 'contain'}}
                                 />
                             ) : (

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.slack.slackjarservice.common.enumtype.foundation.PushWithBackendEnum;
 import com.slack.slackjarservice.foundation.dao.DetectionHistoryDao;
 import com.slack.slackjarservice.foundation.entity.DetectionHistory;
 import com.slack.slackjarservice.foundation.model.dto.DetectionResultDTO;
@@ -11,6 +12,7 @@ import com.slack.slackjarservice.foundation.model.dto.SocketMessageDTO;
 import com.slack.slackjarservice.foundation.model.request.DetectionRequest;
 import com.slack.slackjarservice.foundation.service.YoloDetectionService;
 import com.slack.slackjarservice.foundation.socketio.BackendMessagePush;
+import com.slack.slackjarservice.foundation.socketio.DetectionFrameTracker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -39,9 +41,11 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final BackendMessagePush backendMessagePush;
+    private final DetectionFrameTracker frameTracker;
 
-    public YoloDetectionServiceImpl(BackendMessagePush backendMessagePush) {
+    public YoloDetectionServiceImpl(BackendMessagePush backendMessagePush, DetectionFrameTracker frameTracker) {
         this.backendMessagePush = backendMessagePush;
+        this.frameTracker = frameTracker;
     }
 
     @Override
@@ -110,6 +114,8 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
         String taskId = "video_" + System.currentTimeMillis();
         String outputDir = new File(storagePath, "detection_frames_" + taskId).getAbsolutePath();
 
+        frameTracker.createSession(taskId);
+
         CompletableFuture.runAsync(() -> {
             long startTime = System.currentTimeMillis();
             List<String> command = new ArrayList<>();
@@ -149,15 +155,12 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
                             if ("frame".equals(type)) {
                                 String framePath = (String) frameData.get("framePath");
                                 if (framePath != null) {
-                                    String relativePath = framePath.substring(new File(storagePath).getAbsolutePath().length() + 1);
-                                    frameData.put("frameUrl", "/api/sys-file/local/download?filePath=" + relativePath.replace("\\", "/"));
+                                    frameTracker.addFrame(taskId, framePath);
                                 }
-                                frameData.put("taskId", taskId);
-                            } else {
-                                frameData.put("taskId", taskId);
                             }
 
-                            SocketMessageDTO message = new SocketMessageDTO(frameData, "VIDEO_DETECTION_FRAME");
+                            frameData.put("taskId", taskId);
+                            SocketMessageDTO message = new SocketMessageDTO(frameData, PushWithBackendEnum.VIDEO_DETECTION_FRAME.getCode());
                             backendMessagePush.pushMessageToUser(userId, message);
                         } catch (Exception e) {
                             log.warn("解析帧数据失败: {}", line, e);
@@ -169,18 +172,21 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
                 String stderrOutput = stderrFuture.get();
                 log.info("流式视频检测完成, taskId: {}, stderr: {}", taskId, stderrOutput);
 
+                frameTracker.markComplete(taskId);
+
                 long processTime = System.currentTimeMillis() - startTime;
                 SocketMessageDTO completeMsg = new SocketMessageDTO(
                         Map.of("type", "complete", "taskId", taskId, "processTime", processTime),
-                        "VIDEO_DETECTION_FRAME"
+                        PushWithBackendEnum.VIDEO_DETECTION_FRAME.getCode()
                 );
                 backendMessagePush.pushMessageToUser(userId, completeMsg);
 
             } catch (Exception e) {
                 log.error("流式视频检测失败, taskId: {}", taskId, e);
+                frameTracker.markError(taskId);
                 SocketMessageDTO errorMsg = new SocketMessageDTO(
                         Map.of("type", "error", "taskId", taskId, "message", "检测失败: " + e.getMessage()),
-                        "VIDEO_DETECTION_FRAME"
+                        PushWithBackendEnum.VIDEO_DETECTION_FRAME.getCode()
                 );
                 backendMessagePush.pushMessageToUser(userId, errorMsg);
             }

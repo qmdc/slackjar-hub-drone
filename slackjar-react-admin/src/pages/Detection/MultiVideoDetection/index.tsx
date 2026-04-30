@@ -12,7 +12,6 @@ interface FrameData {
     taskId: string
     frameIndex?: number
     totalFrames?: number
-    frameUrl?: string
     detectionCount?: number
     processTime?: number
     message?: string
@@ -21,7 +20,7 @@ interface FrameData {
 interface ChannelState {
     uploadedFile: string;
     originalUrl: string;
-    currentFrameUrl: string;
+    streamUrl: string;
     selectedModel: string;
     confThreshold: number;
     iouThreshold: number;
@@ -36,7 +35,7 @@ interface ChannelState {
 }
 
 const initialChannel = (modelName: string): ChannelState => ({
-    uploadedFile: '', originalUrl: '', currentFrameUrl: '',
+    uploadedFile: '', originalUrl: '', streamUrl: '',
     selectedModel: modelName, confThreshold: 0.25, iouThreshold: 0.45,
     loading: false, progress: 0, currentFrame: 0, totalFrames: 0,
     totalDetections: 0, processTime: 0, completed: false, taskId: '',
@@ -81,7 +80,6 @@ const MultiVideoDetection: React.FC = () => {
                 case 'frame':
                     return {
                         ...ch,
-                        currentFrameUrl: data.frameUrl ? data.frameUrl + '&_t=' + Date.now() : ch.currentFrameUrl,
                         currentFrame: data.frameIndex !== undefined ? data.frameIndex + 1 : ch.currentFrame,
                         progress: data.frameIndex !== undefined && data.totalFrames ? Math.round(((data.frameIndex + 1) / data.totalFrames) * 100) : ch.progress,
                         totalDetections: ch.totalDetections + (data.detectionCount || 0),
@@ -89,7 +87,7 @@ const MultiVideoDetection: React.FC = () => {
                 case 'complete':
                     return {...ch, progress: 100, loading: false, completed: true, processTime: data.processTime || 0};
                 case 'error':
-                    return {...ch, loading: false, completed: false};
+                    return {...ch, loading: false, completed: false, streamUrl: ''};
                 default:
                     return ch;
             }
@@ -108,7 +106,7 @@ const MultiVideoDetection: React.FC = () => {
                     ...ch,
                     uploadedFile: res.data.filePath,
                     originalUrl: res.data.fileUrl,
-                    currentFrameUrl: '',
+                    streamUrl: '',
                     completed: false,
                     progress: 0,
                     totalDetections: 0,
@@ -129,7 +127,7 @@ const MultiVideoDetection: React.FC = () => {
             return;
         }
 
-        setChannels(prev => prev.map((ch, i) => i === index ? {...ch, loading: true, progress: 0, currentFrame: 0, totalDetections: 0, completed: false, currentFrameUrl: ''} : ch));
+        setChannels(prev => prev.map((ch, i) => i === index ? {...ch, loading: true, progress: 0, currentFrame: 0, totalDetections: 0, completed: false, streamUrl: ''} : ch));
 
         try {
             const res = await detectMultiVideo([{
@@ -140,7 +138,8 @@ const MultiVideoDetection: React.FC = () => {
             }]);
 
             if (res.code === 200 && res.data && res.data[0]?.taskId) {
-                setChannels(prev => prev.map((ch, i) => i === index ? {...ch, taskId: res.data![0].taskId} : ch));
+                const taskId = res.data[0].taskId;
+                setChannels(prev => prev.map((ch, i) => i === index ? {...ch, taskId, streamUrl: `/api/yolo/stream/${taskId}`} : ch));
                 message.info(`通道${index + 1}检测已启动`);
             } else {
                 setChannels(prev => prev.map((ch, i) => i === index ? {...ch, loading: false} : ch));
@@ -163,7 +162,7 @@ const MultiVideoDetection: React.FC = () => {
     const resetChannel = (index: number) => {
         setChannels(prev => prev.map((ch, i) => i === index ? {
             ...ch,
-            uploadedFile: '', originalUrl: '', currentFrameUrl: '',
+            uploadedFile: '', originalUrl: '', streamUrl: '',
             progress: 0, totalDetections: 0, completed: false, taskId: '',
         } : ch));
     };
@@ -251,9 +250,9 @@ const MultiVideoDetection: React.FC = () => {
                                         <span style={{color: '#999', fontSize: 12}}>原始视频</span>
                                     )}
                                 </div>
-                                <div style={{flex: 1, border: channel.currentFrameUrl ? 'none' : '1px dashed #d9d9d9', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}}>
-                                    {channel.currentFrameUrl ? (
-                                        <img src={channel.currentFrameUrl} alt="检测" style={{width: '100%', maxHeight: 150, objectFit: 'contain'}}/>
+                                <div style={{flex: 1, border: channel.streamUrl ? 'none' : '1px dashed #d9d9d9', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}}>
+                                    {channel.streamUrl ? (
+                                        <img src={channel.streamUrl} alt="检测" style={{width: '100%', maxHeight: 150, objectFit: 'contain'}}/>
                                     ) : (
                                         <span style={{color: '#999', fontSize: 12}}>{channel.loading ? '检测中...' : '检测结果'}</span>
                                     )}

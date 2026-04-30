@@ -41,7 +41,7 @@ const initialChannel = (modelName: string): ChannelState => ({
 const MultiVideoDetection: React.FC = () => {
     const [models, setModels] = useState<ModelInfo[]>([]);
     const [channels, setChannels] = useState<ChannelState[]>([]);
-    const socketHandlerRef = useRef<(msg: SocketMessageDTO) => void | null>(null);
+    const socketHandlerRef = useRef<((msg: SocketMessageDTO) => void) | null>(null);
 
     useEffect(() => {
         loadModels();
@@ -165,7 +165,7 @@ const MultiVideoDetection: React.FC = () => {
             if (res.code === 200 && res.data?.taskId) {
                 const tid = res.data.taskId;
                 setChannels(prev => prev.map((ch, i) => i === index ? {
-                    ...ch, taskId, streamUrl: `/api/yolo/stream/${tid}`
+                    ...ch, taskId: tid, streamUrl: `/api/yolo/stream/${tid}`
                 } : ch));
                 registerSocketHandler();
                 message.info(`通道${index + 1}检测已启动`);

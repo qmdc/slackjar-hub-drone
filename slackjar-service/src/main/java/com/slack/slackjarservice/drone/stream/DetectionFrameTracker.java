@@ -16,7 +16,7 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class DetectionFrameTracker {
 
-    private static final long SESSION_TIMEOUT_MS = 10 * 60 * 1000;
+    private static final long SESSION_TIMEOUT_MS = 5 * 60 * 1000;
 
     private final ConcurrentHashMap<String, FrameSession> sessions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService cleanupScheduler = Executors.newSingleThreadScheduledExecutor(r -> {

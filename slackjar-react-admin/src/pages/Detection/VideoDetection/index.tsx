@@ -31,7 +31,7 @@ const VideoDetection: React.FC = () => {
     const [completed, setCompleted] = useState(false);
     const [taskId, setTaskId] = useState<string>('');
 
-    const socketHandlerRef = useRef<(msg: SocketMessageDTO) => void | null>(null);
+    const socketHandlerRef = useRef<((msg: SocketMessageDTO) => void) | null>(null);
 
     useEffect(() => {
         loadModels();

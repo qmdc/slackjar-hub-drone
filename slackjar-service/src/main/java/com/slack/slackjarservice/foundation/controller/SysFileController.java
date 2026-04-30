@@ -12,16 +12,18 @@ import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.*;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.net.URLEncoder;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 系统文件表(SysFile)表控制层
@@ -90,24 +92,87 @@ public class SysFileController extends BaseController {
     private String localStoragePath;
 
     @GetMapping("/local/download")
-    public ResponseEntity<org.springframework.core.io.Resource> downloadLocalFile(@RequestParam("filePath") String filePath) {
+    public ResponseEntity<ByteArrayResource> downloadLocalFile(@RequestParam("filePath") String filePath,
+                                                                @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+        File file;
         try {
-            File file = new File(localStoragePath, filePath);
-            if (!file.exists()) {
-                return ResponseEntity.notFound().build();
+            file = new File(localStoragePath, filePath);
+        } catch (Exception e) {
+            log.error("文件路径解析失败: {}", filePath, e);
+            return ResponseEntity.badRequest().build();
+        }
+
+        if (!file.exists() || !file.isFile()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        long fileLength = file.length();
+        String fileName;
+        try {
+            fileName = URLEncoder.encode(file.getName(), "UTF-8").replace("+", "%20");
+        } catch (Exception e) {
+            fileName = "file";
+        }
+        String contentType = determineContentType(file);
+
+        try {
+            if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+                List<HttpRange> ranges;
+                try {
+                    ranges = HttpRange.parseRanges(rangeHeader);
+                } catch (Exception e) {
+                    log.warn("无效的Range头: {}, 将返回完整文件", rangeHeader);
+                    ranges = Collections.emptyList();
+                }
+
+                if (!ranges.isEmpty()) {
+                    HttpRange httpRange = ranges.get(0);
+                    long start = Math.max(0, httpRange.getRangeStart(fileLength));
+                    long end = Math.min(fileLength - 1, httpRange.getRangeEnd(fileLength));
+                    int contentLength = (int) (end - start + 1);
+
+                    byte[] data = new byte[contentLength];
+                    try (RandomAccessFile raf = new RandomAccessFile(file, "r")) {
+                        raf.seek(start);
+                        raf.readFully(data);
+                    }
+
+                    return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
+                            .contentType(MediaType.parseMediaType(contentType))
+                            .header(HttpHeaders.CONTENT_RANGE, "bytes " + start + "-" + end + "/" + fileLength)
+                            .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                            .contentLength(contentLength)
+                            .body(new ByteArrayResource(data));
+                }
             }
 
-            FileSystemResource resource = new FileSystemResource(file);
-            String fileName = URLEncoder.encode(file.getName(), "UTF-8").replace("+", "%20");
-
+            byte[] data = java.nio.file.Files.readAllBytes(file.toPath());
             return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
-                    .body(resource);
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
+                    .contentLength(fileLength)
+                    .body(new ByteArrayResource(data));
         } catch (Exception e) {
-            log.error("下载本地文件失败: {}", filePath, e);
-            return ResponseEntity.internalServerError().build();
+            log.error("读取文件失败: {}", filePath, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .build();
         }
+    }
+
+    private String determineContentType(File file) {
+        String name = file.getName().toLowerCase();
+        if (name.endsWith(".mp4")) return "video/mp4";
+        if (name.endsWith(".webm")) return "video/webm";
+        if (name.endsWith(".ogg")) return "video/ogg";
+        if (name.endsWith(".mov")) return "video/quicktime";
+        if (name.endsWith(".avi")) return "video/x-msvideo";
+        if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+        if (name.endsWith(".png")) return "image/png";
+        if (name.endsWith(".gif")) return "image/gif";
+        if (name.endsWith(".webp")) return "image/webp";
+        return MediaType.APPLICATION_OCTET_STREAM_VALUE;
     }
 }
 

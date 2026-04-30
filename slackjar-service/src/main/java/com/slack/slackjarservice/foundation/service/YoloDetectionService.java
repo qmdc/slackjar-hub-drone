@@ -14,6 +14,8 @@ public interface YoloDetectionService extends IService<DetectionHistory> {
 
     DetectionResultDTO detectVideo(DetectionRequest request);
 
+    String startVideoDetection(DetectionRequest request, String userId);
+
     List<Map<String, Object>> listModels();
 
     Map<String, Object> getDetectionStats(Long historyId);

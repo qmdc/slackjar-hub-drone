@@ -7,6 +7,7 @@ import {
     SettingOutlined, TranslationOutlined, UserOutlined
 } from "@ant-design/icons";
 import {getFirstChildPathByParent, useMenuItems} from "../../routers/router";
+import {getLastPathByTopRoute} from "../MySider";
 import styles from "../Portal/portal.module.scss";
 
 import enUS from 'antd/locale/en_US';
@@ -61,10 +62,13 @@ const MyHeader: React.FC = () => {
 
     // 处理顶部菜单点击事件
     function handlerTopItemClick(item: { key: string }) {
-        // 获取该菜单下的第一个子路由路径
-        const firstChildPath = getFirstChildPathByParent(item.key);
-        // 如果有子路由则跳转到第一个子路由，否则跳转到当前菜单路径
-        navigate(firstChildPath ? firstChildPath : item.key);
+        const lastPath = getLastPathByTopRoute(item.key);
+        if (lastPath) {
+            navigate(lastPath);
+        } else {
+            const firstChildPath = getFirstChildPathByParent(item.key);
+            navigate(firstChildPath ? firstChildPath : item.key);
+        }
     }
 
     // ========== 国际化相关 ==========
@@ -178,7 +182,7 @@ const MyHeader: React.FC = () => {
                 </div>
 
                 {/* ========== 顶部导航菜单 ========== */}
-                <Menu style={{background: "transparent", minWidth: "500px", flex: 1}} mode="horizontal"
+                <Menu style={{background: "transparent", minWidth: "500px", flex: 1, borderBottom: 'none'}} mode="horizontal"
                       defaultSelectedKeys={[menuKey]}
                       items={topMenus}
                       onClick={handlerTopItemClick}

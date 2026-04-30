@@ -21,7 +21,7 @@ public class BackendMessagePushImpl implements BackendMessagePush {
     private final SocketUserManager socketIOUserService;
 
     /**
-     * 推送消息给指定用户的所有登录端
+     * 推送消息给批量用户的所有登录端
      */
     @Override
     public void pushMessageToUsers(List<String> userIds, SocketMessageDTO message) {
@@ -43,7 +43,7 @@ public class BackendMessagePushImpl implements BackendMessagePush {
             userClients.forEach((platform, client) -> {
                 if (client.isChannelOpen()) {
                     client.sendEvent(CommonConstants.SocketIoPushEventType.BACKEND_MESSAGE, message);
-                    log.info("向用户 {} 的 {} 端推送消息: {}", userId, platform, message);
+//                    log.info("向用户 {} 的 {} 端推送消息: {}", userId, platform, message);
                 } else {
                     // 如果连接已关闭，则从用户连接信息中移除
                     userClients.remove(platform);

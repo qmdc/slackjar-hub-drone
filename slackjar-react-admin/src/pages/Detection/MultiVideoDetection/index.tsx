@@ -1,30 +1,50 @@
-import React, {useState, useEffect} from 'react';
-import {Button, Upload, InputNumber, Select, Card, message, Tag, Statistic, Row, Col, Progress, Space} from 'antd';
+import React, {useState, useEffect, useCallback} from 'react';
+import {Button, Upload, InputNumber, Select, Card, message, Tag, Statistic, Row, Col, Progress} from 'antd';
 import {UploadOutlined, PlayCircleOutlined, RestOutlined, UpCircleOutlined} from '@ant-design/icons';
 import type {UploadProps} from 'antd';
-import {listModels, detectVideo, type ModelInfo, type DetectionResult} from '../../../apis/modules/detection';
+import {listModels, detectMultiVideo, type ModelInfo} from '../../../apis/modules/detection';
 import {useAuthStore} from '../../../store/authStore';
+import {socketManager} from '../../../socketio';
+import type {SocketMessageDTO} from '../../../socketio/types';
+
+interface FrameData {
+    type: string
+    taskId: string
+    frameIndex?: number
+    totalFrames?: number
+    frameUrl?: string
+    detectionCount?: number
+    processTime?: number
+    message?: string
+}
 
 interface ChannelState {
     uploadedFile: string;
     originalUrl: string;
-    resultUrl: string;
+    currentFrameUrl: string;
     selectedModel: string;
     confThreshold: number;
     iouThreshold: number;
-    detectionResult: DetectionResult | null;
     loading: boolean;
     progress: number;
+    currentFrame: number;
+    totalFrames: number;
+    totalDetections: number;
+    processTime: number;
+    completed: boolean;
+    taskId: string;
 }
+
+const initialChannel = (modelName: string): ChannelState => ({
+    uploadedFile: '', originalUrl: '', currentFrameUrl: '',
+    selectedModel: modelName, confThreshold: 0.25, iouThreshold: 0.45,
+    loading: false, progress: 0, currentFrame: 0, totalFrames: 0,
+    totalDetections: 0, processTime: 0, completed: false, taskId: '',
+});
 
 const MultiVideoDetection: React.FC = () => {
     const [models, setModels] = useState<ModelInfo[]>([]);
-    const [channels, setChannels] = useState<ChannelState[]>([
-        {uploadedFile: '', originalUrl: '', resultUrl: '', selectedModel: '', confThreshold: 0.25, iouThreshold: 0.45, detectionResult: null, loading: false, progress: 0},
-        {uploadedFile: '', originalUrl: '', resultUrl: '', selectedModel: '', confThreshold: 0.25, iouThreshold: 0.45, detectionResult: null, loading: false, progress: 0},
-        {uploadedFile: '', originalUrl: '', resultUrl: '', selectedModel: '', confThreshold: 0.25, iouThreshold: 0.45, detectionResult: null, loading: false, progress: 0},
-        {uploadedFile: '', originalUrl: '', resultUrl: '', selectedModel: '', confThreshold: 0.25, iouThreshold: 0.45, detectionResult: null, loading: false, progress: 0},
-    ]);
+    const [channels, setChannels] = useState<ChannelState[]>([]);
 
     useEffect(() => {
         loadModels();
@@ -36,12 +56,49 @@ const MultiVideoDetection: React.FC = () => {
             if (res.code === 200 && res.data) {
                 const data = res.data;
                 setModels(data);
-                setChannels(prev => prev.map(ch => ({...ch, selectedModel: data[0]?.name || ''})));
+                setChannels([
+                    initialChannel(data[0]?.name || ''),
+                    initialChannel(data[0]?.name || ''),
+                    initialChannel(data[0]?.name || ''),
+                    initialChannel(data[0]?.name || ''),
+                ]);
             }
         } catch (e) {
             message.error('加载模型列表失败');
         }
     };
+
+    const handleFrameMessage = useCallback((msg: SocketMessageDTO) => {
+        const data = msg.content as FrameData;
+        if (!data || !data.taskId) return;
+
+        setChannels(prev => prev.map(ch => {
+            if (ch.taskId !== data.taskId) return ch;
+
+            switch (data.type) {
+                case 'start':
+                    return {...ch, totalFrames: data.totalFrames || 0, progress: 0, currentFrame: 0, totalDetections: 0, completed: false};
+                case 'frame':
+                    return {
+                        ...ch,
+                        currentFrameUrl: data.frameUrl ? data.frameUrl + '&_t=' + Date.now() : ch.currentFrameUrl,
+                        currentFrame: data.frameIndex !== undefined ? data.frameIndex + 1 : ch.currentFrame,
+                        progress: data.frameIndex !== undefined && data.totalFrames ? Math.round(((data.frameIndex + 1) / data.totalFrames) * 100) : ch.progress,
+                        totalDetections: ch.totalDetections + (data.detectionCount || 0),
+                    };
+                case 'complete':
+                    return {...ch, progress: 100, loading: false, completed: true, processTime: data.processTime || 0};
+                case 'error':
+                    return {...ch, loading: false, completed: false};
+                default:
+                    return ch;
+            }
+        }));
+    }, []);
+
+    useEffect(() => {
+        socketManager.registerHandler('VIDEO_DETECTION_FRAME', handleFrameMessage);
+    }, [handleFrameMessage]);
 
     const handleFileUpload = (index: number): UploadProps['onChange'] => async (info) => {
         if (info.file.status === 'done') {
@@ -51,8 +108,10 @@ const MultiVideoDetection: React.FC = () => {
                     ...ch,
                     uploadedFile: res.data.filePath,
                     originalUrl: res.data.fileUrl,
-                    resultUrl: '',
-                    detectionResult: null
+                    currentFrameUrl: '',
+                    completed: false,
+                    progress: 0,
+                    totalDetections: 0,
                 } : ch));
                 message.success(`通道${index + 1}文件上传成功`);
             } else {
@@ -70,48 +129,30 @@ const MultiVideoDetection: React.FC = () => {
             return;
         }
 
-        setChannels(prev => prev.map((ch, i) => i === index ? {...ch, loading: true, progress: 0} : ch));
-
-        const progressInterval = setInterval(() => {
-            setChannels(prev => prev.map((ch, i) => i === index ? {...ch, progress: Math.min(ch.progress + 5, 95)} : ch));
-        }, 300);
+        setChannels(prev => prev.map((ch, i) => i === index ? {...ch, loading: true, progress: 0, currentFrame: 0, totalDetections: 0, completed: false, currentFrameUrl: ''} : ch));
 
         try {
-            const res = await detectVideo({
+            const res = await detectMultiVideo([{
                 filePath: channel.uploadedFile,
                 modelName: channel.selectedModel,
                 confThreshold: channel.confThreshold,
                 iouThreshold: channel.iouThreshold,
-            });
+            }]);
 
-            clearInterval(progressInterval);
-            setChannels(prev => prev.map((ch, i) => i === index ? {...ch, progress: 100, loading: false} : ch));
-
-            if (res.code === 200 && res.data) {
-                const result = res.data;
-                setChannels(prev => prev.map((ch, i) => i === index ? {
-                    ...ch,
-                    detectionResult: result,
-                    resultUrl: result.success && result.outputPath ? `/api/sys-file/local/download?filePath=${result.outputPath}` : ''
-                } : ch));
-                if (!result.success) {
-                    message.error(`通道${index + 1}检测失败: ${result.message}`);
-                }
+            if (res.code === 200 && res.data && res.data[0]?.taskId) {
+                setChannels(prev => prev.map((ch, i) => i === index ? {...ch, taskId: res.data![0].taskId} : ch));
+                message.info(`通道${index + 1}检测已启动`);
+            } else {
+                setChannels(prev => prev.map((ch, i) => i === index ? {...ch, loading: false} : ch));
+                message.error(`通道${index + 1}启动检测失败`);
             }
         } catch (e) {
-            clearInterval(progressInterval);
             setChannels(prev => prev.map((ch, i) => i === index ? {...ch, loading: false} : ch));
-            message.error(`通道${index + 1}检测失败`);
+            message.error(`通道${index + 1}启动检测失败`);
         }
     };
 
     const handleDetectAll = async () => {
-        const validChannels = channels.filter(ch => ch.uploadedFile && ch.selectedModel);
-        if (validChannels.length === 0) {
-            message.warning('请至少配置一个通道');
-            return;
-        }
-
         for (let i = 0; i < channels.length; i++) {
             if (channels[i].uploadedFile && channels[i].selectedModel) {
                 await handleDetectChannel(i);
@@ -122,37 +163,17 @@ const MultiVideoDetection: React.FC = () => {
     const resetChannel = (index: number) => {
         setChannels(prev => prev.map((ch, i) => i === index ? {
             ...ch,
-            uploadedFile: '',
-            originalUrl: '',
-            resultUrl: '',
-            detectionResult: null,
-            progress: 0
+            uploadedFile: '', originalUrl: '', currentFrameUrl: '',
+            progress: 0, totalDetections: 0, completed: false, taskId: '',
         } : ch));
     };
-
-    const getAllStats = () => {
-        let totalDetections = 0;
-        let totalFrames = 0;
-        const classCounts: Record<string, number> = {};
-
-        channels.forEach(ch => {
-            if (ch.detectionResult?.success && ch.detectionResult.detections) {
-                totalDetections += ch.detectionResult.detections.length;
-                totalFrames += ch.detectionResult.totalFrames || 0;
-                ch.detectionResult.detections.forEach(d => {
-                    classCounts[d.className] = (classCounts[d.className] || 0) + 1;
-                });
-            }
-        });
-
-        return {totalDetections, totalFrames, classCounts};
-    };
-
-    const stats = getAllStats();
 
     const uploadHeaders = {
         token: useAuthStore.getState().jwt || '',
     };
+
+    const totalAllDetections = channels.reduce((sum, ch) => sum + ch.totalDetections, 0);
+    const activeChannels = channels.filter(ch => ch.completed).length;
 
     return (
         <div style={{padding: 24}}>
@@ -166,7 +187,7 @@ const MultiVideoDetection: React.FC = () => {
                 <div style={{display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16}}>
                     {channels.map((channel, index) => (
                         <Card key={index} title={`通道 ${index + 1}`} bordered={false}>
-                            <div style={{marginBottom: 12}}>
+                            <div style={{marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap'}}>
                                 <Upload
                                     name="file"
                                     action="/api/sys-file/upload?bizType=video"
@@ -175,94 +196,75 @@ const MultiVideoDetection: React.FC = () => {
                                     accept="video/*"
                                     showUploadList={false}
                                 >
-                                    <Button icon={<UploadOutlined/>}>上传视频</Button>
+                                    <Button icon={<UploadOutlined/>}>上传</Button>
                                 </Upload>
+                                <Select
+                                    value={channel.selectedModel}
+                                    onChange={(value) => setChannels(prev => prev.map((ch, i) => i === index ? {...ch, selectedModel: value} : ch))}
+                                    style={{width: 160}}
+                                    options={models.map(m => ({label: m.name, value: m.name}))}
+                                />
+                                <InputNumber
+                                    value={channel.confThreshold}
+                                    onChange={(value) => setChannels(prev => prev.map((ch, i) => i === index ? {...ch, confThreshold: value || 0.25} : ch))}
+                                    min={0.01} max={1} step={0.01} style={{width: 80}} placeholder="Conf"
+                                />
+                                <InputNumber
+                                    value={channel.iouThreshold}
+                                    onChange={(value) => setChannels(prev => prev.map((ch, i) => i === index ? {...ch, iouThreshold: value || 0.45} : ch))}
+                                    min={0.01} max={1} step={0.01} style={{width: 80}} placeholder="IoU"
+                                />
+                                <Button
+                                    type="primary"
+                                    icon={channel.loading ? <RestOutlined spin/> : <PlayCircleOutlined/>}
+                                    onClick={() => handleDetectChannel(index)}
+                                    loading={channel.loading}
+                                    disabled={!channel.uploadedFile || !channel.selectedModel}
+                                    size="small"
+                                >
+                                    检测
+                                </Button>
                                 <Button
                                     icon={<UpCircleOutlined/>}
                                     onClick={() => resetChannel(index)}
-                                    style={{marginLeft: 8}}
                                     disabled={!channel.uploadedFile}
+                                    size="small"
                                 >
                                     重置
                                 </Button>
                             </div>
 
-                            <div style={{marginBottom: 12}}>
-                                <Select
-                                    value={channel.selectedModel}
-                                    onChange={(value) => setChannels(prev => prev.map((ch, i) => i === index ? {...ch, selectedModel: value} : ch))}
-                                    style={{width: '100%'}}
-                                    options={models.map(m => ({label: m.name, value: m.name}))}
+                            {channel.loading && (
+                                <Progress
+                                    percent={channel.progress}
+                                    status="active"
+                                    size="small"
+                                    format={() => `${channel.currentFrame}/${channel.totalFrames}`}
                                 />
+                            )}
+
+                            <div style={{display: 'flex', gap: 8, minHeight: 150}}>
+                                <div style={{flex: 1, border: channel.originalUrl ? 'none' : '1px dashed #d9d9d9', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}}>
+                                    {channel.originalUrl ? (
+                                        <video src={channel.originalUrl} controls style={{width: '100%', maxHeight: 150, objectFit: 'contain'}}/>
+                                    ) : (
+                                        <span style={{color: '#999', fontSize: 12}}>原始视频</span>
+                                    )}
+                                </div>
+                                <div style={{flex: 1, border: channel.currentFrameUrl ? 'none' : '1px dashed #d9d9d9', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden'}}>
+                                    {channel.currentFrameUrl ? (
+                                        <img src={channel.currentFrameUrl} alt="检测" style={{width: '100%', maxHeight: 150, objectFit: 'contain'}}/>
+                                    ) : (
+                                        <span style={{color: '#999', fontSize: 12}}>{channel.loading ? '检测中...' : '检测结果'}</span>
+                                    )}
+                                </div>
                             </div>
 
-                            <Row gutter={8} style={{marginBottom: 12}}>
-                                <Col span={11}>
-                                    <InputNumber
-                                        value={channel.confThreshold}
-                                        onChange={(value) => setChannels(prev => prev.map((ch, i) => i === index ? {...ch, confThreshold: value || 0.25} : ch))}
-                                        min={0.01}
-                                        max={1}
-                                        step={0.01}
-                                        style={{width: '100%'}}
-                                        placeholder="Conf"
-                                    />
-                                </Col>
-                                <Col span={11}>
-                                    <InputNumber
-                                        value={channel.iouThreshold}
-                                        onChange={(value) => setChannels(prev => prev.map((ch, i) => i === index ? {...ch, iouThreshold: value || 0.45} : ch))}
-                                        min={0.01}
-                                        max={1}
-                                        step={0.01}
-                                        style={{width: '100%'}}
-                                        placeholder="IoU"
-                                    />
-                                </Col>
-                            </Row>
-
-                            <Button
-                                type="primary"
-                                icon={channel.loading ? <RestOutlined spin/> : <PlayCircleOutlined/>}
-                                onClick={() => handleDetectChannel(index)}
-                                loading={channel.loading}
-                                disabled={!channel.uploadedFile || !channel.selectedModel}
-                            >
-                                开始检测
-                            </Button>
-
-                            {channel.loading && (
-                                <Progress percent={channel.progress} status="active" style={{marginTop: 12}}/>
-                            )}
-
-                            {channel.originalUrl && (
-                                <div style={{marginTop: 12}}>
-                                    <video
-                                        src={channel.originalUrl}
-                                        controls
-                                        style={{maxWidth: '100%', maxHeight: 150}}
-                                    />
-                                </div>
-                            )}
-
-                            {channel.resultUrl && (
-                                <div style={{marginTop: 12}}>
-                                    <video
-                                        src={channel.resultUrl}
-                                        controls
-                                        style={{maxWidth: '100%', maxHeight: 150}}
-                                    />
-                                </div>
-                            )}
-
-                            {channel.detectionResult && (
-                                <div style={{marginTop: 12}}>
-                                    <Tag color={channel.detectionResult.success ? 'green' : 'red'}>
-                                        {channel.detectionResult.success ? '检测完成' : '检测失败'}
-                                    </Tag>
-                                    <span style={{marginLeft: 8}}>
-                                        检测目标: {channel.detectionResult.detections?.length || 0}个
-                                    </span>
+                            {channel.completed && (
+                                <div style={{marginTop: 8, display: 'flex', gap: 8}}>
+                                    <Tag color="green">完成</Tag>
+                                    <Tag>{channel.totalDetections}个目标</Tag>
+                                    <Tag>{channel.processTime}ms</Tag>
                                 </div>
                             )}
                         </Card>
@@ -273,29 +275,18 @@ const MultiVideoDetection: React.FC = () => {
             <Card title="统计摘要">
                 <Row gutter={16}>
                     <Col span={6}>
-                        <Statistic title="总检测目标数" value={stats.totalDetections}/>
+                        <Statistic title="总检测目标数" value={totalAllDetections}/>
                     </Col>
                     <Col span={6}>
-                        <Statistic title="总处理帧数" value={stats.totalFrames}/>
+                        <Statistic title="活跃通道" value={activeChannels}/>
                     </Col>
                     <Col span={6}>
-                        <Statistic title="活跃通道" value={channels.filter(ch => ch.detectionResult?.success).length}/>
+                        <Statistic title="总处理帧数" value={channels.reduce((sum, ch) => sum + ch.currentFrame, 0)}/>
                     </Col>
                     <Col span={6}>
-                        <Statistic title="检测类别数" value={Object.keys(stats.classCounts).length}/>
+                        <Statistic title="总耗时" value={channels.reduce((sum, ch) => sum + ch.processTime, 0)} suffix="ms"/>
                     </Col>
                 </Row>
-
-                <div style={{marginTop: 24}}>
-                    <label style={{display: 'block', marginBottom: 12, fontWeight: 'bold'}}>目标类别分布</label>
-                    <div style={{display: 'flex', flexWrap: 'wrap', gap: 12}}>
-                        {Object.entries(stats.classCounts).map(([name, count]) => (
-                            <Tag key={name} color="purple">
-                                {name}: {count}个
-                            </Tag>
-                        ))}
-                    </div>
-                </div>
             </Card>
         </div>
     );

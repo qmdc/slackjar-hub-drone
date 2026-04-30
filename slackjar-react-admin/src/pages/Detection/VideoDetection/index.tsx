@@ -1,9 +1,25 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useRef, useCallback} from 'react';
 import {Button, Upload, InputNumber, Select, Card, message, Tag, Statistic, Row, Col, Progress} from 'antd';
 import {UploadOutlined, PlayCircleOutlined, RestOutlined, VideoCameraOutlined} from '@ant-design/icons';
 import type {UploadProps} from 'antd';
-import {listModels, detectVideo, type ModelInfo, type DetectionResult} from '../../../apis/modules/detection';
+import {listModels, detectVideo, type ModelInfo} from '../../../apis/modules/detection';
 import {useAuthStore} from '../../../store/authStore';
+import {socketManager} from '../../../socketio';
+import type {SocketMessageDTO} from '../../../socketio/types';
+
+interface FrameData {
+    type: string
+    taskId: string
+    frameIndex?: number
+    totalFrames?: number
+    frameUrl?: string
+    detectionCount?: number
+    processTime?: number
+    message?: string
+    fps?: number
+    width?: number
+    height?: number
+}
 
 const VideoDetection: React.FC = () => {
     const [models, setModels] = useState<ModelInfo[]>([]);
@@ -12,13 +28,23 @@ const VideoDetection: React.FC = () => {
     const [iouThreshold, setIouThreshold] = useState(0.45);
     const [uploadedFile, setUploadedFile] = useState<string>('');
     const [originalVideoUrl, setOriginalVideoUrl] = useState<string>('');
-    const [resultVideoUrl, setResultVideoUrl] = useState<string>('');
-    const [detectionResult, setDetectionResult] = useState<DetectionResult | null>(null);
+    const [currentFrameUrl, setCurrentFrameUrl] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [progress, setProgress] = useState(0);
+    const [totalFrames, setTotalFrames] = useState(0);
+    const [currentFrame, setCurrentFrame] = useState(0);
+    const [totalDetections, setTotalDetections] = useState(0);
+    const [processTime, setProcessTime] = useState(0);
+    const [completed, setCompleted] = useState(false);
+    const frameHandlerRef = useRef<((msg: SocketMessageDTO) => void) | null>(null);
 
     useEffect(() => {
         loadModels();
+        return () => {
+            if (frameHandlerRef.current) {
+                socketManager.registerHandler('VIDEO_DETECTION_FRAME', frameHandlerRef.current);
+            }
+        };
     }, []);
 
     const loadModels = async () => {
@@ -35,14 +61,62 @@ const VideoDetection: React.FC = () => {
         }
     };
 
+    const handleFrameMessage = useCallback((msg: SocketMessageDTO) => {
+        const data = msg.content as FrameData;
+        if (!data) return;
+
+        switch (data.type) {
+            case 'start':
+                setTotalFrames(data.totalFrames || 0);
+                setProgress(0);
+                setCurrentFrame(0);
+                setTotalDetections(0);
+                setCompleted(false);
+                break;
+            case 'frame':
+                if (data.frameUrl) {
+                    setCurrentFrameUrl(data.frameUrl + '&_t=' + Date.now());
+                }
+                if (data.frameIndex !== undefined && data.totalFrames) {
+                    setCurrentFrame(data.frameIndex + 1);
+                    setProgress(Math.round(((data.frameIndex + 1) / data.totalFrames) * 100));
+                }
+                if (data.detectionCount !== undefined) {
+                    setTotalDetections(prev => prev + data.detectionCount!);
+                }
+                break;
+            case 'complete':
+                setProgress(100);
+                setLoading(false);
+                setCompleted(true);
+                if (data.processTime) {
+                    setProcessTime(data.processTime);
+                }
+                message.success('视频检测完成');
+                break;
+            case 'error':
+                setLoading(false);
+                setCompleted(false);
+                message.error(data.message || '检测失败');
+                break;
+        }
+    }, []);
+
+    useEffect(() => {
+        frameHandlerRef.current = handleFrameMessage;
+        socketManager.registerHandler('VIDEO_DETECTION_FRAME', handleFrameMessage);
+    }, [handleFrameMessage]);
+
     const handleFileUpload: UploadProps['onChange'] = async (info) => {
         if (info.file.status === 'done') {
             const res = info.file.response as { code: number; data: { fileUrl: string; filePath: string } };
             if (res.code === 200) {
                 setUploadedFile(res.data.filePath);
                 setOriginalVideoUrl(res.data.fileUrl);
-                setResultVideoUrl('');
-                setDetectionResult(null);
+                setCurrentFrameUrl('');
+                setCompleted(false);
+                setProgress(0);
+                setTotalDetections(0);
                 message.success('文件上传成功');
             } else {
                 message.error('文件上传失败');
@@ -60,10 +134,10 @@ const VideoDetection: React.FC = () => {
 
         setLoading(true);
         setProgress(0);
-        
-        const progressInterval = setInterval(() => {
-            setProgress(prev => Math.min(prev + 5, 95));
-        }, 500);
+        setCurrentFrame(0);
+        setTotalDetections(0);
+        setCompleted(false);
+        setCurrentFrameUrl('');
 
         try {
             const res = await detectVideo({
@@ -73,34 +147,16 @@ const VideoDetection: React.FC = () => {
                 iouThreshold,
             });
 
-            clearInterval(progressInterval);
-            setProgress(100);
-
-            if (res.code === 200 && res.data) {
-                const result = res.data;
-                setDetectionResult(result);
-                if (result.success && result.outputPath) {
-                    setResultVideoUrl(`/api/sys-file/local/download?filePath=${result.outputPath}`);
-                }
-                if (!result.success) {
-                    message.error(result.message);
-                }
+            if (res.code === 200 && res.data?.taskId) {
+                message.info('检测已启动，实时接收结果...');
+            } else {
+                setLoading(false);
+                message.error('启动检测失败');
             }
         } catch (e) {
-            clearInterval(progressInterval);
-            message.error('检测失败');
-        } finally {
             setLoading(false);
+            message.error('启动检测失败');
         }
-    };
-
-    const getClassDistribution = () => {
-        if (!detectionResult?.detections) return [];
-        const counts: Record<string, number> = {};
-        detectionResult.detections.forEach(d => {
-            counts[d.className] = (counts[d.className] || 0) + 1;
-        });
-        return Object.entries(counts).map(([name, count]) => ({name, count}));
     };
 
     const uploadHeaders = {
@@ -110,9 +166,9 @@ const VideoDetection: React.FC = () => {
     return (
         <div style={{padding: 24}}>
             <Card title="视频目标检测" style={{marginBottom: 24}}>
-                <Row gutter={16}>
-                    <Col span={8}>
-                        <div style={{marginBottom: 16}}>
+                <div style={{marginBottom: 24}}>
+                    <Row gutter={16}>
+                        <Col span={6}>
                             <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>上传视频</label>
                             <Upload
                                 name="file"
@@ -124,9 +180,8 @@ const VideoDetection: React.FC = () => {
                             >
                                 <Button icon={<UploadOutlined/>}>选择视频</Button>
                             </Upload>
-                        </div>
-
-                        <div style={{marginBottom: 16}}>
+                        </Col>
+                        <Col span={6}>
                             <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>选择模型</label>
                             <Select
                                 value={selectedModel}
@@ -134,108 +189,117 @@ const VideoDetection: React.FC = () => {
                                 style={{width: '100%'}}
                                 options={models.map(m => ({label: m.name, value: m.name}))}
                             />
-                        </div>
+                        </Col>
+                        <Col span={5}>
+                            <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>置信度阈值</label>
+                            <InputNumber
+                                value={confThreshold}
+                                onChange={(value) => setConfThreshold(value || 0.25)}
+                                min={0.01}
+                                max={1}
+                                step={0.01}
+                                style={{width: '100%'}}
+                            />
+                        </Col>
+                        <Col span={5}>
+                            <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>IoU阈值</label>
+                            <InputNumber
+                                value={iouThreshold}
+                                onChange={(value) => setIouThreshold(value || 0.45)}
+                                min={0.01}
+                                max={1}
+                                step={0.01}
+                                style={{width: '100%'}}
+                            />
+                        </Col>
+                        <Col span={2} style={{display: 'flex', alignItems: 'flex-end'}}>
+                            <Button
+                                type="primary"
+                                icon={loading ? <RestOutlined spin/> : <VideoCameraOutlined/>}
+                                onClick={handleDetect}
+                                loading={loading}
+                                disabled={loading}
+                            >
+                                检测
+                            </Button>
+                        </Col>
+                    </Row>
+                    {loading && (
+                        <Progress
+                            percent={progress}
+                            status="active"
+                            style={{marginTop: 16}}
+                            format={() => `${currentFrame}/${totalFrames} 帧`}
+                        />
+                    )}
+                </div>
 
-                        <div style={{marginBottom: 16}}>
-                            <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>参数配置</label>
-                            <Row gutter={8}>
-                                <Col span={11}>
-                                    <label style={{display: 'block', marginBottom: 4}}>置信度阈值</label>
-                                    <InputNumber
-                                        value={confThreshold}
-                                        onChange={(value) => setConfThreshold(value || 0.25)}
-                                        min={0.01}
-                                        max={1}
-                                        step={0.01}
-                                        style={{width: '100%'}}
-                                    />
-                                </Col>
-                                <Col span={11}>
-                                    <label style={{display: 'block', marginBottom: 4}}>IoU阈值</label>
-                                    <InputNumber
-                                        value={iouThreshold}
-                                        onChange={(value) => setIouThreshold(value || 0.45)}
-                                        min={0.01}
-                                        max={1}
-                                        step={0.01}
-                                        style={{width: '100%'}}
-                                    />
-                                </Col>
-                            </Row>
-                        </div>
-
-                        <Button
-                            type="primary"
-                            icon={loading ? <RestOutlined spin/> : <VideoCameraOutlined/>}
-                            onClick={handleDetect}
-                            loading={loading}
-                            disabled={loading}
-                        >
-                            开始检测
-                        </Button>
-
-                        {loading && (
-                            <div style={{marginTop: 16}}>
-                                <Progress percent={progress} status="active"/>
-                            </div>
-                        )}
-                    </Col>
-
-                    <Col span={8}>
-                        {originalVideoUrl && (
-                            <div style={{marginBottom: 16}}>
-                                <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>原始视频</label>
+                <Row gutter={16}>
+                    <Col span={12}>
+                        <div style={{
+                            border: originalVideoUrl ? 'none' : '1px dashed #d9d9d9',
+                            borderRadius: 6,
+                            padding: originalVideoUrl ? 0 : 48,
+                            textAlign: 'center',
+                            minHeight: 320,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            {originalVideoUrl ? (
                                 <video
                                     src={originalVideoUrl}
                                     controls
-                                    style={{maxWidth: '100%', maxHeight: 250}}
+                                    style={{width: '100%', height: '100%', objectFit: 'contain'}}
                                 />
-                            </div>
-                        )}
+                            ) : (
+                                <span style={{color: '#999'}}>请先上传视频</span>
+                            )}
+                        </div>
                     </Col>
-
-                    <Col span={8}>
-                        {resultVideoUrl && (
-                            <div>
-                                <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>检测结果</label>
-                                <video
-                                    src={resultVideoUrl}
-                                    controls
-                                    style={{maxWidth: '100%', maxHeight: 250}}
+                    <Col span={12}>
+                        <div style={{
+                            border: currentFrameUrl ? 'none' : '1px dashed #d9d9d9',
+                            borderRadius: 6,
+                            padding: currentFrameUrl ? 0 : 48,
+                            textAlign: 'center',
+                            minHeight: 320,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            {currentFrameUrl ? (
+                                <img
+                                    src={currentFrameUrl}
+                                    alt="检测结果"
+                                    style={{width: '100%', height: '100%', objectFit: 'contain'}}
                                 />
-                            </div>
-                        )}
+                            ) : (
+                                <span style={{color: '#999'}}>{loading ? '检测中...' : '暂无检测结果'}</span>
+                            )}
+                        </div>
                     </Col>
                 </Row>
             </Card>
 
-            {detectionResult && (
+            {completed && (
                 <Card title="检测统计">
                     <Row gutter={16}>
                         <Col span={6}>
-                            <Statistic title="检测目标数" value={detectionResult.detections?.length || 0}/>
+                            <Statistic title="总帧数" value={currentFrame}/>
                         </Col>
                         <Col span={6}>
-                            <Statistic title="处理帧数" value={detectionResult.totalFrames || 0}/>
+                            <Statistic title="检测目标数" value={totalDetections}/>
                         </Col>
                         <Col span={6}>
-                            <Statistic title="平均置信度" value={detectionResult.detections?.reduce((sum, d) => sum + d.confidence, 0) / (detectionResult.detections?.length || 1) || 0} precision={2}/>
+                            <Statistic title="处理耗时" value={processTime} suffix="ms"/>
                         </Col>
                         <Col span={6}>
-                            <Statistic title="最高置信度" value={Math.max(...(detectionResult.detections?.map(d => d.confidence) || [0]))} precision={2}/>
+                            <Statistic title="平均每帧耗时"
+                                       value={currentFrame > 0 ? Math.round(processTime / currentFrame) : 0}
+                                       suffix="ms"/>
                         </Col>
                     </Row>
-
-                    <div style={{marginTop: 24}}>
-                        <label style={{display: 'block', marginBottom: 12, fontWeight: 'bold'}}>目标类别分布</label>
-                        <div style={{display: 'flex', flexWrap: 'wrap', gap: 12}}>
-                            {getClassDistribution().map(item => (
-                                <Tag key={item.name} color="green">
-                                    {item.name}: {item.count}个
-                                </Tag>
-                            ))}
-                        </div>
-                    </div>
                 </Card>
             )}
         </div>

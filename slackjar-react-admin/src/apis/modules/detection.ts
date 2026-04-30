@@ -9,11 +9,11 @@ export function detectImage(params: DetectionRequest): Promise<ResponseData<Dete
     return request.post('/yolo/detect/image', params)
 }
 
-export function detectVideo(params: DetectionRequest): Promise<ResponseData<DetectionResult>> {
+export function detectVideo(params: DetectionRequest): Promise<ResponseData<{ taskId: string; message: string }>> {
     return request.post('/yolo/detect/video', params)
 }
 
-export function detectMultiVideo(requests: DetectionRequest[]): Promise<ResponseData<DetectionResult[]>> {
+export function detectMultiVideo(requests: DetectionRequest[]): Promise<ResponseData<{ taskId: string; message: string }[]>> {
     return request.post('/yolo/detect/multi-video', requests)
 }
 

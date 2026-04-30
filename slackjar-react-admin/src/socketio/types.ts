@@ -14,12 +14,10 @@ export interface SocketMessageDTO {
  * Socket消息业务类型枚举（后端推送给前端）
  */
 export enum PushWithBackendEnum {
-    // 成功-普通字符串通知消息
     SUCCESS_STRING_NOTICE = 'SUCCESS_STRING_NOTICE',
-    // 失败-普通字符串通知消息
     FAIL_STRING_NOTICE = 'FAIL_STRING_NOTICE',
-    // IP地级市信息
     IP_CITY_INFO = 'IP_CITY_INFO',
+    VIDEO_DETECTION_FRAME = 'VIDEO_DETECTION_FRAME',
 }
 
 /**

@@ -100,9 +100,9 @@ const ImageDetection: React.FC = () => {
     return (
         <div style={{padding: 24}}>
             <Card title="图片目标检测" style={{marginBottom: 24}}>
-                <Row gutter={16}>
-                    <Col span={12}>
-                        <div style={{marginBottom: 16}}>
+                <div style={{marginBottom: 24}}>
+                    <Row gutter={16}>
+                        <Col span={6}>
                             <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>上传图片</label>
                             <Upload
                                 name="file"
@@ -114,9 +114,8 @@ const ImageDetection: React.FC = () => {
                             >
                                 <Button icon={<UploadOutlined/>}>选择图片</Button>
                             </Upload>
-                        </div>
-
-                        <div style={{marginBottom: 16}}>
+                        </Col>
+                        <Col span={6}>
                             <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>选择模型</label>
                             <Select
                                 value={selectedModel}
@@ -124,65 +123,84 @@ const ImageDetection: React.FC = () => {
                                 style={{width: '100%'}}
                                 options={models.map(m => ({label: m.name, value: m.name}))}
                             />
-                        </div>
+                        </Col>
+                        <Col span={5}>
+                            <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>置信度阈值</label>
+                            <InputNumber
+                                value={confThreshold}
+                                onChange={(value) => setConfThreshold(value || 0.25)}
+                                min={0.01}
+                                max={1}
+                                step={0.01}
+                                style={{width: '100%'}}
+                            />
+                        </Col>
+                        <Col span={5}>
+                            <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>IoU阈值</label>
+                            <InputNumber
+                                value={iouThreshold}
+                                onChange={(value) => setIouThreshold(value || 0.45)}
+                                min={0.01}
+                                max={1}
+                                step={0.01}
+                                style={{width: '100%'}}
+                            />
+                        </Col>
+                        <Col span={2} style={{display: 'flex', alignItems: 'flex-end'}}>
+                            <Button
+                                type="primary"
+                                icon={loading ? <RestOutlined spin/> : <PlayCircleOutlined/>}
+                                onClick={handleDetect}
+                                loading={loading}
+                            >
+                                检测
+                            </Button>
+                        </Col>
+                    </Row>
+                </div>
 
-                        <div style={{marginBottom: 16}}>
-                            <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>参数配置</label>
-                            <Row gutter={16}>
-                                <Col span={11}>
-                                    <label style={{display: 'block', marginBottom: 4}}>置信度阈值 (Conf)</label>
-                                    <InputNumber
-                                        value={confThreshold}
-                                        onChange={(value) => setConfThreshold(value || 0.25)}
-                                        min={0.01}
-                                        max={1}
-                                        step={0.01}
-                                        style={{width: '100%'}}
-                                    />
-                                </Col>
-                                <Col span={11}>
-                                    <label style={{display: 'block', marginBottom: 4}}>IoU阈值 (IoU)</label>
-                                    <InputNumber
-                                        value={iouThreshold}
-                                        onChange={(value) => setIouThreshold(value || 0.45)}
-                                        min={0.01}
-                                        max={1}
-                                        step={0.01}
-                                        style={{width: '100%'}}
-                                    />
-                                </Col>
-                            </Row>
-                        </div>
-
-                        <Button
-                            type="primary"
-                            icon={loading ? <RestOutlined spin/> : <PlayCircleOutlined/>}
-                            onClick={handleDetect}
-                            loading={loading}
-                        >
-                            开始检测
-                        </Button>
-                    </Col>
-
+                <Row gutter={16}>
                     <Col span={12}>
-                        {originalImageUrl && (
-                            <div style={{marginBottom: 16}}>
-                                <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>原始图片</label>
+                        <div style={{
+                            border: originalImageUrl ? 'none' : '1px dashed #d9d9d9',
+                            borderRadius: 6,
+                            padding: originalImageUrl ? 0 : 48,
+                            textAlign: 'center',
+                            minHeight: 280,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            {originalImageUrl ? (
                                 <Image
                                     src={originalImageUrl}
-                                    style={{maxWidth: '100%', maxHeight: 300, objectFit: 'contain'}}
+                                    style={{width: '100%', height: 'auto'}}
                                 />
-                            </div>
-                        )}
-                        {resultImageUrl && (
-                            <div>
-                                <label style={{display: 'block', marginBottom: 8, fontWeight: 'bold'}}>检测结果</label>
+                            ) : (
+                                <span style={{color: '#999'}}>请先上传图片</span>
+                            )}
+                        </div>
+                    </Col>
+                    <Col span={12}>
+                        <div style={{
+                            border: resultImageUrl ? 'none' : '1px dashed #d9d9d9',
+                            borderRadius: 6,
+                            padding: resultImageUrl ? 0 : 48,
+                            textAlign: 'center',
+                            minHeight: 280,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            {resultImageUrl ? (
                                 <Image
                                     src={resultImageUrl}
-                                    style={{maxWidth: '100%', maxHeight: 300, objectFit: 'contain'}}
+                                    style={{width: '100%', height: 'auto'}}
                                 />
-                            </div>
-                        )}
+                            ) : (
+                                <span style={{color: '#999'}}>{loading ? '检测中...' : '暂无检测结果'}</span>
+                            )}
+                        </div>
                     </Col>
                 </Row>
             </Card>

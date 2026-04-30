@@ -118,7 +118,19 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ApiResponse<Void> handleException(Exception e) {
+        if (isClientDisconnected(e)) {
+            log.warn("客户端断开连接: {}", e.getMessage());
+            return null;
+        }
         log.error("系统异常: {}", e.getMessage(), e);
         return ApiResponse.error(ResponseEnum.ERROR.getCode(), ResponseEnum.ERROR.getMessage());
+    }
+
+    private boolean isClientDisconnected(Exception e) {
+        String msg = e.getMessage();
+        if (msg == null) return false;
+        return msg.contains("Connection reset") || msg.contains("Broken pipe") ||
+                (e.getCause() != null && (e.getCause().getMessage() != null &&
+                        (e.getCause().getMessage().contains("Connection reset") || e.getCause().getMessage().contains("Broken pipe"))));
     }
 }

@@ -6,9 +6,16 @@ import com.slack.slackjarservice.foundation.entity.DetectionHistory;
 import com.slack.slackjarservice.foundation.model.dto.DetectionResultDTO;
 import com.slack.slackjarservice.foundation.model.request.DetectionRequest;
 import com.slack.slackjarservice.foundation.service.YoloDetectionService;
+import com.slack.slackjarservice.foundation.socketio.DetectionFrameTracker;
+import cn.dev33.satoken.stp.StpUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 
@@ -18,9 +25,11 @@ import java.util.Map;
 public class YoloController extends BaseController {
 
     private final YoloDetectionService detectionService;
+    private final DetectionFrameTracker frameTracker;
 
-    public YoloController(YoloDetectionService detectionService) {
+    public YoloController(YoloDetectionService detectionService, DetectionFrameTracker frameTracker) {
         this.detectionService = detectionService;
+        this.frameTracker = frameTracker;
     }
 
     @GetMapping("/models")
@@ -54,21 +63,17 @@ public class YoloController extends BaseController {
     }
 
     @PostMapping("/detect/video")
-    public ApiResponse<DetectionResultDTO> detectVideo(@RequestBody DetectionRequest request) {
-        long startTime = System.currentTimeMillis();
+    public ApiResponse<Map<String, String>> detectVideo(@RequestBody DetectionRequest request) {
         try {
-            DetectionResultDTO result = detectionService.detectVideo(request);
-            
-            long processTime = System.currentTimeMillis() - startTime;
-            detectionService.saveDetectionResult("VIDEO", request.getModelName(), 
-                    request.getFilePath(), request.getFilePath(), 
-                    result.getOutputPath(), result, 
-                    request.getConfThreshold(), request.getIouThreshold(), processTime);
-            
-            return success(result);
+            String userId = String.valueOf(StpUtil.getLoginId());
+            String taskId = detectionService.startVideoDetection(request, userId);
+            if (taskId == null) {
+                return error("模型不存在");
+            }
+            return success(Map.of("taskId", taskId, "message", "检测已启动"));
         } catch (Exception e) {
-            log.error("视频检测失败", e);
-            return error("视频检测失败: " + e.getMessage());
+            log.error("启动视频检测失败", e);
+            return error("启动视频检测失败: " + e.getMessage());
         }
     }
 
@@ -120,18 +125,13 @@ public class YoloController extends BaseController {
     }
 
     @PostMapping("/detect/multi-video")
-    public ApiResponse<List<DetectionResultDTO>> detectMultiVideo(@RequestBody List<DetectionRequest> requests) {
+    public ApiResponse<List<Map<String, String>>> detectMultiVideo(@RequestBody List<DetectionRequest> requests) {
         try {
-            List<DetectionResultDTO> results = requests.stream()
+            String userId = String.valueOf(StpUtil.getLoginId());
+            List<Map<String, String>> results = requests.stream()
                     .map(request -> {
-                        long startTime = System.currentTimeMillis();
-                        DetectionResultDTO result = detectionService.detectVideo(request);
-                        long processTime = System.currentTimeMillis() - startTime;
-                        detectionService.saveDetectionResult("VIDEO", request.getModelName(),
-                                request.getFilePath(), request.getFilePath(),
-                                result.getOutputPath(), result,
-                                request.getConfThreshold(), request.getIouThreshold(), processTime);
-                        return result;
+                        String taskId = detectionService.startVideoDetection(request, userId);
+                        return Map.of("taskId", taskId != null ? taskId : "", "message", taskId != null ? "检测已启动" : "模型不存在");
                     })
                     .toList();
             return success(results);

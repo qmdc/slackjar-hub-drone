@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.slack.slackjarservice.foundation.dao.DetectionHistoryDao;
 import com.slack.slackjarservice.foundation.entity.DetectionHistory;
 import com.slack.slackjarservice.foundation.model.dto.DetectionResultDTO;
+import com.slack.slackjarservice.foundation.model.dto.SocketMessageDTO;
 import com.slack.slackjarservice.foundation.model.request.DetectionRequest;
 import com.slack.slackjarservice.foundation.service.YoloDetectionService;
+import com.slack.slackjarservice.foundation.socketio.BackendMessagePush;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,11 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
     private String storagePath;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final BackendMessagePush backendMessagePush;
+
+    public YoloDetectionServiceImpl(BackendMessagePush backendMessagePush) {
+        this.backendMessagePush = backendMessagePush;
+    }
 
     @Override
     public DetectionResultDTO detectImage(DetectionRequest request) {
@@ -89,6 +96,97 @@ public class YoloDetectionServiceImpl extends ServiceImpl<DetectionHistoryDao, D
         command.add(String.valueOf(request.getIouThreshold()));
 
         return executeCommand(command, outputPath);
+    }
+
+    @Override
+    public String startVideoDetection(DetectionRequest request, String userId) {
+        String modelFullPath = findModelPath(request.getModelName());
+        if (modelFullPath == null) {
+            return null;
+        }
+
+        String fileKey = extractFileKey(request.getFilePath());
+        String inputPath = new File(storagePath, fileKey).getAbsolutePath();
+        String taskId = "video_" + System.currentTimeMillis();
+        String outputDir = new File(storagePath, "detection_frames_" + taskId).getAbsolutePath();
+
+        CompletableFuture.runAsync(() -> {
+            long startTime = System.currentTimeMillis();
+            List<String> command = new ArrayList<>();
+            command.add(pythonPath);
+            command.add(scriptPath);
+            command.add("detect_video_stream");
+            command.add(inputPath);
+            command.add(outputDir);
+            command.add(modelFullPath);
+            command.add(String.valueOf(request.getConfThreshold()));
+            command.add(String.valueOf(request.getIouThreshold()));
+
+            try {
+                ProcessBuilder pb = new ProcessBuilder(command);
+                Process process = pb.start();
+
+                CompletableFuture<String> stderrFuture = CompletableFuture.supplyAsync(() -> {
+                    StringBuilder sb = new StringBuilder();
+                    try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                        String line;
+                        while ((line = errorReader.readLine()) != null) {
+                            sb.append(line).append("\n");
+                        }
+                    } catch (Exception e) {
+                        sb.append("读取stderr失败: ").append(e.getMessage());
+                    }
+                    return sb.toString();
+                });
+
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        try {
+                            Map<String, Object> frameData = objectMapper.readValue(line, Map.class);
+                            String type = (String) frameData.get("type");
+
+                            if ("frame".equals(type)) {
+                                String framePath = (String) frameData.get("framePath");
+                                if (framePath != null) {
+                                    String relativePath = framePath.substring(new File(storagePath).getAbsolutePath().length() + 1);
+                                    frameData.put("frameUrl", "/api/sys-file/local/download?filePath=" + relativePath.replace("\\", "/"));
+                                }
+                                frameData.put("taskId", taskId);
+                            } else {
+                                frameData.put("taskId", taskId);
+                            }
+
+                            SocketMessageDTO message = new SocketMessageDTO(frameData, "VIDEO_DETECTION_FRAME");
+                            backendMessagePush.pushMessageToUser(userId, message);
+                        } catch (Exception e) {
+                            log.warn("解析帧数据失败: {}", line, e);
+                        }
+                    }
+                }
+
+                process.waitFor();
+                String stderrOutput = stderrFuture.get();
+                log.info("流式视频检测完成, taskId: {}, stderr: {}", taskId, stderrOutput);
+
+                long processTime = System.currentTimeMillis() - startTime;
+                SocketMessageDTO completeMsg = new SocketMessageDTO(
+                        Map.of("type", "complete", "taskId", taskId, "processTime", processTime),
+                        "VIDEO_DETECTION_FRAME"
+                );
+                backendMessagePush.pushMessageToUser(userId, completeMsg);
+
+            } catch (Exception e) {
+                log.error("流式视频检测失败, taskId: {}", taskId, e);
+                SocketMessageDTO errorMsg = new SocketMessageDTO(
+                        Map.of("type", "error", "taskId", taskId, "message", "检测失败: " + e.getMessage()),
+                        "VIDEO_DETECTION_FRAME"
+                );
+                backendMessagePush.pushMessageToUser(userId, errorMsg);
+            }
+        });
+
+        return taskId;
     }
 
     /**
